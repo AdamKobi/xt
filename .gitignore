@@ -1,0 +1,13 @@
+/bin
+/dist
+/site
+/CHANGELOG.md
+
+# VS Code
+.vscode
+
+# macOS
+.DS_Store
+
+vendor/
+node_modules
