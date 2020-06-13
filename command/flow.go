@@ -30,7 +30,7 @@ var flowCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		tag := viper.GetString("tag")
 		searchPattern := args[0] + "*"
-		flowId := args[1]
+		flowID := args[1]
 		instanceIds, err := providers.GetIds(tag, searchPattern)
 		if err != nil {
 			logging.Main.WithFields(log.Fields{
@@ -39,34 +39,34 @@ var flowCmd = &cobra.Command{
 			}).Fatalf("fetching ids failed, %v", err)
 		}
 
-		if !flowCmdViper.IsSet("flows." + flowId) {
+		if !flowCmdViper.IsSet("flows." + flowID) {
 			logging.Main.WithFields(log.Fields{
-				"flowId": flowId,
-				"path":   "flows." + flowId,
+				"flowId": flowID,
+				"path":   "flows." + flowID,
 			}).Fatalf("flow not found in config file")
 		}
 
 		var (
-			instanceId, identifier, input string
+			instanceID, identifier, input string
 			json                          map[string]map[string]string
 		)
 
 		if !flowCmdViper.GetBool("all") {
-			instanceId = utils.SelectInstance(instanceIds, searchPattern)
+			instanceID = utils.SelectInstance(instanceIds, searchPattern)
 		}
-		for _, cmd := range config.XT.Flows[flowId] {
+		for _, cmd := range config.XT.Flows[flowID] {
 			if flowCmdViper.GetBool("all") {
 				remoteCmd := strings.Split(cmd.Run, " ")
 				executers := ssh.CreateSSHExecuters(instanceIds, "", remoteCmd)
 				ssh.RunMultiple(executers)
 			} else {
-				cmd.Run = strings.Replace(cmd.Run, "{{identifier}}", identifier, -1)
+				cmd.Run = strings.Replace(cmd.Run, "__IDENTEFIER__", identifier, -1)
 				remoteCmd := strings.Split(cmd.Run, " ")
 				ctx := logging.Main.WithFields(log.Fields{
-					"host":    instanceId,
+					"host":    instanceID,
 					"command": remoteCmd,
 				})
-				executer := ssh.NewSSHExecuter(instanceId, remoteCmd)
+				executer := ssh.NewSSHExecuter(instanceID, remoteCmd)
 				if cmd.TTY {
 					ssh.CommandWithTTY(executer)
 				} else {

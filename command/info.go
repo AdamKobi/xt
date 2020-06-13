@@ -23,14 +23,13 @@ var infoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		tag := viper.GetString("tag")
 		searchPattern := args[0] + "*"
-		profile := config.GetProfile()
 		instances, err := providers.GetInstances(tag, searchPattern)
 		if err != nil {
 			log.Main.Fatal(err.Error())
 		}
 
 		for _, providerInstances := range instances {
-			utils.PrintInfo(profile.GetStringSlice("commands.info.fields"), providerInstances)
+			utils.PrintInfo(infoCmdViper.GetStringSlice("commands.info.keys"), providerInstances)
 		}
 	},
 }

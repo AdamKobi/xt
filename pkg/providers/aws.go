@@ -7,11 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
-var defaultKeys = []string{
-	"instanceId", "image", "type", "lifecycle", "arn", "privateIpAddress",
-	"key", "launchTime", "state", "availabilityZone", "privateDNS", "subnet", "vpc",
-}
-
 //NewAWSProvider returns AWS provider configs
 func NewAWSProvider() *AWSProvider {
 	profile := config.GetProfile()
@@ -69,25 +64,32 @@ func unmarshal(dio *ec2.DescribeInstancesOutput) map[string]map[string]string {
 			}
 
 			instances[name] = map[string]string{
-				"arch":             *inst.Architecture,
-				"hypervisor":       *inst.Hypervisor,
-				"arn":              *inst.IamInstanceProfile.Arn,
-				"image":            *inst.ImageId,
-				"instanceId":       *inst.InstanceId,
-				"lifecycle":        *inst.InstanceLifecycle,
-				"type":             *inst.InstanceType,
-				"key":              *inst.KeyName,
+				"arch":             getValue(inst.Architecture),
+				"hypervisor":       getValue(inst.Hypervisor),
+				"arn":              getValue(inst.IamInstanceProfile.Arn),
+				"image":            getValue(inst.ImageId),
+				"instanceId":       getValue(inst.InstanceId),
+				"lifecycle":        getValue(inst.InstanceLifecycle),
+				"type":             getValue(inst.InstanceType),
+				"key":              getValue(inst.KeyName),
 				"launchTime":       inst.LaunchTime.String(),
-				"state":            *inst.Monitoring.State,
-				"availabilityZone": *inst.Placement.AvailabilityZone,
-				"privateDNS":       *inst.PrivateDnsName,
-				"privateIpAddress": *inst.PrivateIpAddress,
-				"publicDNS":        *inst.PublicDnsName,
-				"subnet":           *inst.SubnetId,
-				"virtualization":   *inst.VirtualizationType,
-				"vpc":              *inst.VpcId,
+				"state":            getValue(inst.Monitoring.State),
+				"availabilityZone": getValue(inst.Placement.AvailabilityZone),
+				"privateDNS":       getValue(inst.PrivateDnsName),
+				"privateIpAddress": getValue(inst.PrivateIpAddress),
+				"publicDNS":        getValue(inst.PublicDnsName),
+				"subnet":           getValue(inst.SubnetId),
+				"virtualization":   getValue(inst.VirtualizationType),
+				"vpc":              getValue(inst.VpcId),
 			}
 		}
 	}
 	return instances
+}
+
+func getValue(val *string) string {
+	if val != nil {
+		return *val
+	}
+	return "not found"
 }

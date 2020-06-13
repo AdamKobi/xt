@@ -42,9 +42,9 @@ var scpCmd = &cobra.Command{
 			executers := ssh.CreateSCPExecuters(instanceIds, localFilePath, remoteFilePath, upload)
 			ssh.RunMultiple(executers)
 		} else {
-			instanceId := utils.SelectInstance(instanceIds, searchPattern)
-			log.Main.Infof("Connecting to %s...", instanceId)
-			executer := ssh.NewSCPExecuter(instanceId, localFilePath, remoteFilePath, upload)
+			instanceID := utils.SelectInstance(instanceIds, searchPattern)
+			log.Main.Infof("Connecting to %s...", instanceID)
+			executer := ssh.NewSCPExecuter(instanceID, localFilePath, remoteFilePath, upload)
 			fmt.Println(executer)
 			ssh.CommandWithTTY(executer)
 		}
