@@ -47,13 +47,13 @@ var execCmd = &cobra.Command{
 			executers := ssh.CreateSSHExecuters(instanceIds, "", remoteCmd)
 			ssh.RunMultiple(executers)
 		} else {
-			instanceId := utils.SelectInstance(instanceIds, searchPattern)
-			if !execCmdViper.GetBool("force") && !utils.GetApproval(strings.Join(remoteCmd, " "), []string{instanceId}) {
+			instanceID := utils.SelectInstance(instanceIds, searchPattern)
+			if !execCmdViper.GetBool("force") && !utils.GetApproval(strings.Join(remoteCmd, " "), []string{instanceID}) {
 				logging.Main.Error("cancelled...")
 				os.Exit(0)
 			}
-			logging.Main.Infof("Connecting to %s...", instanceId)
-			executer := ssh.NewSSHExecuter(instanceId, remoteCmd)
+			logging.Main.Infof("Connecting to %s...", instanceID)
+			executer := ssh.NewSSHExecuter(instanceID, remoteCmd)
 			if execCmdViper.GetBool("tty") {
 				ssh.CommandWithTTY(executer)
 			} else {

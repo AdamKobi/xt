@@ -110,4 +110,8 @@ func InitViper(v *viper.Viper) {
 	v.SetDefault("ssh.args", []string{
 		"-C", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null"})
+	v.SetDefault("commands.info.keys", []string{
+		"instanceId", "image", "type", "lifecycle", "arn", "privateIpAddress",
+		"key", "launchTime", "state", "availabilityZone", "privateDNS", "subnet", "vpc",
+	})
 }
