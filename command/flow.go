@@ -2,10 +2,10 @@ package command
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/adamkobi/xt/config"
-	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/adamkobi/xt/pkg/providers"
 	"github.com/adamkobi/xt/pkg/ssh"
 	"github.com/adamkobi/xt/pkg/utils"
@@ -28,22 +28,16 @@ var flowCmd = &cobra.Command{
 	Short: "Execute remote commands from config file",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		tag := viper.GetString("tag")
-		searchPattern := args[0] + "*"
+		searchPattern := args[0]
 		flowID := args[1]
-		instanceIds, err := providers.GetIds(tag, searchPattern)
+
+		instanceIDs, err := providers.GetIds(searchPattern)
 		if err != nil {
-			logging.Main.WithFields(log.Fields{
-				"search pattern": searchPattern,
-				"search tag":     tag,
-			}).Fatalf("fetching ids failed, %v", err)
+			logger.Fatalf("fetching instance ids failed, %v", err)
 		}
 
 		if !flowCmdViper.IsSet("flows." + flowID) {
-			logging.Main.WithFields(log.Fields{
-				"flowId": flowID,
-				"path":   "flows." + flowID,
-			}).Fatalf("flow not found in config file")
+			logger.Fatalf("%s not found in config file", "flows["+flowID+"]")
 		}
 
 		var (
@@ -52,34 +46,38 @@ var flowCmd = &cobra.Command{
 		)
 
 		if !flowCmdViper.GetBool("all") {
-			instanceID = utils.SelectInstance(instanceIds, searchPattern)
+			instanceID = utils.SelectInstance(instanceIDs, searchPattern)
 		}
-		for _, cmd := range config.XT.Flows[flowID] {
+
+		flows := config.GetFlows()
+		for _, cmd := range flows[flowID] {
+
 			if flowCmdViper.GetBool("all") {
 				remoteCmd := strings.Split(cmd.Run, " ")
-				executers := ssh.CreateSSHExecuters(instanceIds, "", remoteCmd)
-				ssh.RunMultiple(executers)
+				executers := ssh.CreateSSHExecuters(instanceIDs, remoteCmd)
+				ssh.RunMany(executers)
 			} else {
 				cmd.Run = strings.Replace(cmd.Run, "__IDENTEFIER__", identifier, -1)
 				remoteCmd := strings.Split(cmd.Run, " ")
-				ctx := logging.Main.WithFields(log.Fields{
+				ctx := logger.WithFields(log.Fields{
 					"host":    instanceID,
 					"command": remoteCmd,
 				})
-				executer := ssh.NewSSHExecuter(instanceID, remoteCmd)
+				e := ssh.NewSSHExecuter(instanceID, remoteCmd)
 				if cmd.TTY {
-					ssh.CommandWithTTY(executer)
+					e.CommandWithTTY()
 				} else {
-					output := ssh.CommandWithOutput(executer)
+					output := e.CommandWithOutput()
 
-					if output.Stderr != "" {
-						ctx.Fatalf("failed running command, received %s", output.Stderr)
+					if output.Error {
+						ctx.Fatalf("command failed")
+						fmt.Fprint(os.Stderr, output.Data)
 					}
-					input = output.Stdout
+					input = output.Data
 				}
 				if cmd.Print {
 					ctx.Info("printing info...")
-					ctx = logging.Main.WithFields(log.Fields{
+					ctx = logger.WithFields(log.Fields{
 						"root":       cmd.Root,
 						"identifier": cmd.Identifier,
 						"keys":       cmd.Keys,

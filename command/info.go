@@ -2,9 +2,7 @@ package command
 
 import (
 	"github.com/adamkobi/xt/config"
-	log "github.com/adamkobi/xt/pkg/logging"
 	"github.com/adamkobi/xt/pkg/providers"
-	"github.com/adamkobi/xt/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -21,15 +19,12 @@ var infoCmd = &cobra.Command{
 	Short: "Gather data on instances and print as table",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		tag := viper.GetString("tag")
-		searchPattern := args[0] + "*"
-		instances, err := providers.GetInstances(tag, searchPattern)
+		searchPattern := args[0]
+		instances, err := providers.GetInstances(searchPattern)
 		if err != nil {
-			log.Main.Fatal(err.Error())
+			logger.Fatal(err.Error())
 		}
 
-		for _, providerInstances := range instances {
-			utils.PrintInfo(infoCmdViper.GetStringSlice("commands.info.keys"), providerInstances)
-		}
+		providers.PrintInfo(instances)
 	},
 }

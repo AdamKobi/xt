@@ -1,10 +1,7 @@
 package command
 
 import (
-	"fmt"
-
 	"github.com/adamkobi/xt/config"
-	log "github.com/adamkobi/xt/pkg/logging"
 	"github.com/adamkobi/xt/pkg/providers"
 	"github.com/adamkobi/xt/pkg/ssh"
 	"github.com/adamkobi/xt/pkg/utils"
@@ -27,26 +24,24 @@ var scpCmd = &cobra.Command{
 	Short: "upload/download files from remote servers",
 	Args:  cobra.ExactArgs(3),
 	Run: func(cmd *cobra.Command, args []string) {
-		tag := viper.GetString("tag")
-		searchPattern := args[0] + "*"
+		searchPattern := args[0]
 		localFilePath := args[1]
 		remoteFilePath := args[2]
 
-		instanceIds, err := providers.GetIds(tag, searchPattern)
+		instanceIDs, err := providers.GetIds(searchPattern)
 		if err != nil {
-			log.Main.Fatalf("fetching instance ids failed, %v", err)
+			logger.Fatalf("fetching instance ids failed, %v", err)
 		}
 
 		upload := scpCmdViper.GetBool("upload")
 		if scpCmdViper.GetBool("all") {
-			executers := ssh.CreateSCPExecuters(instanceIds, localFilePath, remoteFilePath, upload)
-			ssh.RunMultiple(executers)
+			e := ssh.CreateSCPExecuters(instanceIDs, localFilePath, remoteFilePath, upload)
+			ssh.RunMany(e)
 		} else {
-			instanceID := utils.SelectInstance(instanceIds, searchPattern)
-			log.Main.Infof("Connecting to %s...", instanceID)
-			executer := ssh.NewSCPExecuter(instanceID, localFilePath, remoteFilePath, upload)
-			fmt.Println(executer)
-			ssh.CommandWithTTY(executer)
+			instanceID := utils.SelectInstance(instanceIDs, searchPattern)
+			logger.Infof("Connecting to %s...", instanceID)
+			e := ssh.NewSCPExecuter(instanceID, localFilePath, remoteFilePath, upload)
+			e.CommandWithTTY()
 		}
 	},
 }

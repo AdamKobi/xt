@@ -8,11 +8,13 @@ import (
 
 	survey "github.com/AlecAivazis/survey/v2"
 	"github.com/adamkobi/xt/config"
-	log "github.com/adamkobi/xt/pkg/logging"
+	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/mgutz/ansi"
 	"github.com/olekukonko/tablewriter"
 	"github.com/tidwall/gjson"
 )
+
+var logger = logging.GetLogger()
 
 //GetChoices will prompt user with server names found and require user to choose server
 func getChoices(name, message string, names []string) string {
@@ -30,7 +32,7 @@ func getChoices(name, message string, names []string) string {
 	}
 	err := survey.Ask(qs, &answers)
 	if err != nil {
-		log.Main.Fatal(err.Error())
+		logger.Fatal(err.Error())
 	}
 	return answers
 }
@@ -55,15 +57,15 @@ func GetApproval(cmd string, instances []string) bool {
 //SelectInstance returns the user selected instance or default instance
 func SelectInstance(instances []string, searchPattern string) string {
 	if len(instances) == 1 {
-		log.Main.Info("Found 1 host: " + instances[0])
+		logger.Info("Found 1 host: " + instances[0])
 		return instances[0]
 	} else if len(instances) > 1 {
-		log.Main.Infof(fmt.Sprintf("Found %d hosts", len(instances)))
+		logger.Infof(fmt.Sprintf("Found %d hosts", len(instances)))
 		choicesName := "SSHSeverList"
 		choicesMessage := "Instances:"
 		return getChoices(choicesName, choicesMessage, instances)
 	} else {
-		log.Main.Info("NO SERVERS FOUND, trying to connect to " + searchPattern)
+		logger.Info("NO SERVERS FOUND, trying to connect to " + searchPattern)
 		return searchPattern
 	}
 }
@@ -79,6 +81,7 @@ func Table(header []string, instances [][]string) {
 	tbl.Render()
 }
 
+//UnmarshalKeys
 func UnmarshalKeys(json string, dataStruct config.Command) (map[string]map[string]string, error) {
 	instances := make(map[string]map[string]string)
 

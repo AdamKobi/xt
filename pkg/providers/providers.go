@@ -2,70 +2,98 @@ package providers
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/adamkobi/xt/config"
-	"github.com/adamkobi/xt/pkg/utils"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/adamkobi/xt/pkg/logging"
+	"github.com/olekukonko/tablewriter"
 )
 
 //Provider is an interface describing actions in cloud provider
 type Provider interface {
-	FindByID(tag, id string) (map[string]map[string]string, error)
+	FindByID(searchPattern string) ([]EC2Instance, error)
 }
 
-//AWSProvider describes AWS configs
-type AWSProvider struct {
-	VPC             string
-	Region          string
-	CredsProfile    string
-	AccessKeyID     string
-	SecretAccessKey string
-	Session         *session.Session
-}
+var logger = logging.GetLogger()
 
-//GetProviders returns slice of all current found providers
 func getProviders() []Provider {
-	profile := config.GetProfile()
-	var providers []Provider
-	if profile.IsSet("providers.aws") {
-		providers = append(providers, NewAWSProvider())
+	var foundProviders = []Provider{}
+	providers := config.GetProviders()
+	for provider, cfg := range providers {
+		switch provider {
+		case "aws":
+			foundProviders = append(foundProviders, NewAWSProvider(cfg))
+		case "gcp":
+			logger.Error("gcp not supported, continuing...")
+		case "azure":
+			logger.Error("azure not supported, continuing...")
+		default:
+			logger.Errorf("%s not supported, continuing...", provider)
+		}
 	}
-	// if profile.IsSet("providers.gcp") {
-	// 	return "gcp"
-	// }
-	// if profile.IsSet("providers.azure") {
-	// 	return "azure"
-	// }
-	return providers
+
+	if len(foundProviders) == 0 {
+		logger.Fatal("no providers found, unable to proceed.")
+	}
+
+	return foundProviders
 }
 
 //GetInstances returns slice of instance data per provider
-func GetInstances(tag, searchPattern string) ([]map[string]map[string]string, error) {
+func GetInstances(searchPattern string) ([]EC2Instance, error) {
 	providers := getProviders()
 	if len(providers) == 0 {
 		return nil, fmt.Errorf("could not find supported provider, please verify you have this set in the config file")
 	}
 
-	var allInstances []map[string]map[string]string
+	var allInstances []EC2Instance
 	for _, provider := range providers {
-		instances, err := provider.FindByID(tag, searchPattern)
+		instances, err := provider.FindByID(searchPattern)
 		if err != nil {
 			return nil, err
 		}
-		allInstances = append(allInstances, instances)
+		allInstances = append(allInstances, instances...)
 	}
 	return allInstances, nil
 }
 
-func GetIds(tag, searchPattern string) ([]string, error) {
-	instancesByProvider, err := GetInstances(tag, searchPattern)
+//GetIds returns all instances names
+func GetIds(searchPattern string) ([]string, error) {
+	instances, err := GetInstances(searchPattern)
 	if err != nil {
 		return nil, err
 	}
-
-	var instanceIds []string
-	for _, instanceGroup := range instancesByProvider {
-		instanceIds = append(instanceIds, utils.GetIds(instanceGroup)...)
+	var instanceNames []string
+	for _, instance := range instances {
+		instanceNames = append(instanceNames, instance.Name)
 	}
-	return instanceIds, nil
+
+	return instanceNames, nil
+}
+
+//PrintInfo prints the fields requested by user as a table info of the instances
+func PrintInfo(instances []EC2Instance) error {
+	table := tablewriter.NewWriter(os.Stdout)
+	header := []string{"name", "id", "type", "image", "ip address",
+		"availability zone", "subnet", "launch time", "lifecycle"}
+	table.SetHeader(header)
+
+	table.SetAutoWrapText(false)
+	table.SetAutoFormatHeaders(true)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetCenterSeparator("")
+	table.SetColumnSeparator("")
+	table.SetRowSeparator("")
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetTablePadding("\t") // pad with tabs
+	table.SetNoWhiteSpace(true)
+
+	for _, inst := range instances {
+		table.Append([]string{inst.Name, inst.InstanceID, inst.InstanceType, inst.ImageID, inst.PrivateIPAddress,
+			inst.AvailabilityZone, inst.SubnetID, inst.LaunchTime, inst.InstanceLifecycle})
+	}
+	table.Render()
+	return nil
 }

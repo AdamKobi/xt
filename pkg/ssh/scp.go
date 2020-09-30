@@ -6,25 +6,24 @@ import (
 	"path"
 
 	"github.com/adamkobi/xt/config"
-	"github.com/spf13/viper"
 )
 
-//NewExecuter creates a new SSH executer with required args
+//NewSCPExecuter creates a new SCP executer with required args
 func NewSCPExecuter(instance string, localFilePath, remoteFilePath string, upload bool) *Executer {
 	args := getSCPArgs(instance, localFilePath, remoteFilePath, upload)
 	return &Executer{
-		Host:      instance,
-		RemoteCmd: localFilePath + "|" + remoteFilePath,
-		Cmd:       exec.Command(SCPBinary, args...),
+		Hostname:  instance,
+		RemoteCmd: []string{localFilePath, remoteFilePath},
+		Cmd:       exec.Command(scpBinary, args...),
 	}
 }
 
 func getSCPArgs(host, localFilePath, remoteFilePath string, upload bool) []string {
-	current := config.GetProfile()
-	domain := current.GetString("ssh.domain")
-	sshUser := current.GetString("ssh.user")
+	p := config.GetProfile()
+	domain := p.SSH.Domain
+	sshUser := p.SSH.User
 	connStr := fmt.Sprintf("%s@%s%s:%s", sshUser, host, domain, remoteFilePath)
-	args := viper.GetStringSlice("ssh.args")
+	args := p.SSH.Options
 	if upload {
 		args = append(args, localFilePath, connStr)
 		return args
@@ -33,6 +32,7 @@ func getSCPArgs(host, localFilePath, remoteFilePath string, upload bool) []strin
 	return args
 }
 
+//CreateSCPExecuters creates multiple SCP executers with same local and remote file paths
 func CreateSCPExecuters(instanceIds []string, localFilePath, remoteFilePath string, upload bool) []*Executer {
 	localDir := path.Dir(localFilePath)
 	localFile := path.Base(localFilePath)
@@ -43,11 +43,11 @@ func CreateSCPExecuters(instanceIds []string, localFilePath, remoteFilePath stri
 	}
 
 	var executers []*Executer
-	for _, instanceId := range instanceIds {
+	for _, instanceID := range instanceIds {
 		if !upload && len(instanceIds) > 1 {
-			localFilePath = path.Join(localDir, instanceId+"_"+localFile)
+			localFilePath = path.Join(localDir, instanceID+"_"+localFile)
 		}
-		executers = append(executers, NewSCPExecuter(instanceId, localFilePath, remoteFilePath, upload))
+		executers = append(executers, NewSCPExecuter(instanceID, localFilePath, remoteFilePath, upload))
 	}
 	return executers
 }

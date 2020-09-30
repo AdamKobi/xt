@@ -5,8 +5,10 @@ import (
 	"github.com/adamkobi/xt/pkg/logging"
 )
 
+var logger = logging.GetLogger()
+
 func main() {
 	if err := command.RootCmd.Execute(); err != nil {
-		logging.Main.Error(err.Error())
+		logger.Error(err.Error())
 	}
 }

@@ -5,5 +5,10 @@ import (
 	"github.com/apex/log/handlers/cli"
 )
 
-//Main is the global logger
-var Main log.Logger = log.Logger{Handler: cli.Default, Level: log.DebugLevel}
+//Logger is the main logger for XT
+var Logger log.Logger = log.Logger{Handler: cli.Default, Level: log.DebugLevel}
+
+//GetLogger returns a pointer to Logger
+func GetLogger() *log.Logger {
+	return &Logger
+}

@@ -4,105 +4,103 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"github.com/adamkobi/xt/config"
 	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/apex/log"
-	"github.com/spf13/viper"
 )
 
-const SSHBinary = "/usr/bin/ssh"
-const SCPBinary = "/usr/bin/scp"
-
-type SSHConfig struct {
-}
-
-type Output struct {
-	Stdout string
-	Stderr string
-}
+const sshBinary = "/usr/bin/ssh"
+const scpBinary = "/usr/bin/scp"
 
 type Executer struct {
-	Host      string
-	RemoteCmd string
+	Hostname  string
+	RemoteCmd []string
 	Cmd       *exec.Cmd
 }
 
+type Output struct {
+	Data  string
+	Error bool
+}
+
+var logger = logging.GetLogger()
+
 //Connect will run command and wait for shell to return (mainly used for SSH)
-func Connect(instance string) error {
-	executer := NewSSHExecuter(instance, nil)
-	return CommandWithTTY(executer)
+func Connect(instance string) {
+	logger.Infof("Connecting to %s...", instance)
+	e := NewSSHExecuter(instance, nil)
+	e.CommandWithTTY()
 }
 
 //RunMultiple will run multiple commands on remote servers and return output/error
-func RunMultiple(executers []*Executer) {
-	outputChan := make(chan Output, 10)
+func RunMany(executers []*Executer) {
+	output := make(chan Output, 10)
 	timeout := time.After(60 * time.Second)
 
 	for _, executer := range executers {
 		go func(executer *Executer) {
-			outputChan <- CommandWithOutput(executer)
+			output <- executer.CommandWithOutput()
 		}(executer)
 	}
-	for i := 0; i < len(executers); i++ {
+	for _, executer := range executers {
+		ctx := logger.WithFields(log.Fields{
+			"host":    executer.Hostname,
+			"command": executer.RemoteCmd,
+		})
 		select {
-		case output := <-outputChan:
-			if output.Stderr != "" {
-				logging.Main.WithFields(log.Fields{
-					"host":    executers[i].Host,
-					"command": executers[i].RemoteCmd,
-				}).Errorf("command failed, %v", output.Stderr)
+		case out := <-output:
+			if out.Error {
+				ctx.Errorf("command failed")
+				fmt.Fprint(os.Stderr, out.Data)
 			} else {
-				logging.Main.WithFields(log.Fields{
-					"host":      executers[i].Host,
-					"command":   executers[i].RemoteCmd,
-					"exit-code": executers[i].Cmd.ProcessState,
-				}).Info("command output")
-				fmt.Print(output.Stdout)
+				ctx.Info("command success")
+				fmt.Fprint(os.Stdout, out.Data)
 			}
 		case <-timeout:
-			logging.Main.WithFields(log.Fields{
-				"host":    executers[i].Host,
-				"command": executers[i].RemoteCmd,
-			}).Errorf("command timedout!")
+			ctx.Errorf("command timedout!")
 		}
 	}
 }
 
 //CommandWithOutput will run a single command and return stdout or stderr
-func CommandWithOutput(executer *Executer) Output {
-	logging.Main.WithFields(log.Fields{
-		"host":    executer.Host,
-		"command": executer.RemoteCmd,
+func (e Executer) CommandWithOutput() Output {
+	logger.WithFields(log.Fields{
+		"host":    e.Hostname,
+		"command": e.RemoteCmd,
 	}).Info("runnning command...")
-	r, err := executer.Cmd.CombinedOutput()
-	outputStr := string(r)
+
+	output, err := e.Cmd.CombinedOutput()
 	if err != nil {
-		fmt.Println(executer.Cmd.ProcessState)
-		return Output{Stderr: outputStr}
+		return Output{
+			Data:  string(output),
+			Error: true,
+		}
 	}
-	return Output{Stdout: outputStr}
+	return Output{
+		Data: string(output),
+	}
 }
 
 //CommandWithTTY will run command and request for TTY
-func CommandWithTTY(executer *Executer) error {
-	executer.Cmd.Stdin = os.Stdin
-	executer.Cmd.Stdout = os.Stdout
-	executer.Cmd.Stderr = os.Stderr
-	if err := executer.Cmd.Run(); err != nil {
-		return err
+func (e Executer) CommandWithTTY() {
+	e.Cmd.Stdout = os.Stdout
+	e.Cmd.Stderr = os.Stderr
+	e.Cmd.Stdin = os.Stdin
+
+	if err := e.Cmd.Run(); err != nil {
+		panic(err)
 	}
-	return nil
+	os.Exit(0)
 }
 
 func getSSHArgs(host string) []string {
-	current := config.GetProfile()
-	domain := current.GetString("ssh.domain")
-	sshUser := current.GetString("ssh.user")
+	p := config.GetProfile()
+	domain := p.SSH.Domain
+	sshUser := p.SSH.User
 	connStr := fmt.Sprintf("%s@%s%s", sshUser, host, domain)
-	args := viper.GetStringSlice("ssh.args")
+	args := p.SSH.Options
 	args = append(args, connStr)
 	return args
 }
@@ -114,13 +112,13 @@ func NewSSHExecuter(instance string, remoteCmd []string) *Executer {
 		args = append(args, remoteCmd...)
 	}
 	return &Executer{
-		Host:      instance,
-		RemoteCmd: strings.Join(remoteCmd, " "),
-		Cmd:       exec.Command(SSHBinary, args...),
+		Hostname:  instance,
+		RemoteCmd: remoteCmd,
+		Cmd:       exec.Command(sshBinary, args...),
 	}
 }
 
-func CreateSSHExecuters(instanceIds []string, localCmd string, remoteCmd []string) []*Executer {
+func CreateSSHExecuters(instanceIds []string, remoteCmd []string) []*Executer {
 	var executers []*Executer
 	for _, instanceId := range instanceIds {
 		executer := NewSSHExecuter(instanceId, remoteCmd)

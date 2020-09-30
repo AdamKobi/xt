@@ -6,12 +6,16 @@ import (
 	"strings"
 
 	"github.com/adamkobi/xt/config"
+	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 // Version is dynamically set by the toolchain or overridden by the Makefile.
-var Version = "DEV"
+var (
+	Version = "DEV"
+	logger  = logging.GetLogger()
+)
 
 func init() {
 	if Version == "DEV" {

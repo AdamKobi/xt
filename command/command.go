@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/adamkobi/xt/config"
-	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/adamkobi/xt/pkg/providers"
 	"github.com/adamkobi/xt/pkg/ssh"
 	"github.com/adamkobi/xt/pkg/utils"
@@ -15,7 +14,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-var execCmdViper = viper.New()
+var (
+	execCmdViper = viper.New()
+)
 
 func init() {
 	config.InitViper(execCmdViper)
@@ -31,41 +32,51 @@ var execCmd = &cobra.Command{
 	Short: "Execute remote commands",
 	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		tag := viper.GetString("tag")
-		searchPattern := args[0] + "*"
+		searchPattern := args[0]
 		remoteCmd := args[1:]
 
-		instanceIds, err := providers.GetIds(tag, searchPattern)
+		instanceIDs, err := providers.GetIds(searchPattern)
 		if err != nil {
-			logging.Main.Fatalf("fetching instance ids failed, %v", err)
+			logger.Fatalf("fetching instance ids failed, %v", err)
 		}
+
 		if execCmdViper.GetBool("all") {
-			if !execCmdViper.GetBool("force") && !utils.GetApproval(strings.Join(remoteCmd, " "), instanceIds) {
-				logging.Main.Error("cancelled...")
-				os.Exit(0)
+			if !checkUserApproval(instanceIDs, remoteCmd) {
+				logger.Fatalf("cancelled...")
 			}
-			executers := ssh.CreateSSHExecuters(instanceIds, "", remoteCmd)
-			ssh.RunMultiple(executers)
+			executers := ssh.CreateSSHExecuters(instanceIDs, remoteCmd)
+			ssh.RunMany(executers)
+			os.Exit(0)
+		}
+
+		instanceID := utils.SelectInstance(instanceIDs, searchPattern)
+		if !checkUserApproval([]string{instanceID}, remoteCmd) {
+			logger.Fatal("cancelled...")
+		}
+
+		e := ssh.NewSSHExecuter(instanceID, remoteCmd)
+		if execCmdViper.GetBool("tty") {
+			e.CommandWithTTY()
+			os.Exit(0)
+		}
+		output := e.CommandWithOutput()
+		ctx := logger.WithFields(log.Fields{
+			"host":    e.Hostname,
+			"command": e.RemoteCmd,
+		})
+		if output.Error {
+			ctx.Errorf("command failed")
+			fmt.Fprint(os.Stderr, output.Data)
 		} else {
-			instanceID := utils.SelectInstance(instanceIds, searchPattern)
-			if !execCmdViper.GetBool("force") && !utils.GetApproval(strings.Join(remoteCmd, " "), []string{instanceID}) {
-				logging.Main.Error("cancelled...")
-				os.Exit(0)
-			}
-			logging.Main.Infof("Connecting to %s...", instanceID)
-			executer := ssh.NewSSHExecuter(instanceID, remoteCmd)
-			if execCmdViper.GetBool("tty") {
-				ssh.CommandWithTTY(executer)
-			} else {
-				output := ssh.CommandWithOutput(executer)
-				if output.Stderr != "" {
-					logging.Main.WithFields(log.Fields{
-						"host":    executer.Host,
-						"command": executer.RemoteCmd,
-					}).Fatal("command failed")
-				}
-				fmt.Println(output.Stdout)
-			}
+			ctx.Info("command output")
+			fmt.Fprint(os.Stdout, output.Data)
 		}
 	},
+}
+
+func checkUserApproval(instanceIDs, remoteCmd []string) bool {
+	if !execCmdViper.GetBool("force") && !utils.GetApproval(strings.Join(remoteCmd, " "), instanceIDs) {
+		return false
+	}
+	return true
 }

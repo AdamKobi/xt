@@ -1,15 +1,30 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"sort"
 
 	"github.com/adamkobi/xt/pkg/logging"
 	"github.com/spf13/viper"
 )
 
-var configFilePaths = []string{"$HOME/.xt", "."}
-var XT Config
+var (
+	logger          = logging.GetLogger()
+	cfg             Config
+	configFilePaths = []string{"$HOME/.xt", "."}
+	sshOptions      = []string{
+		"-C", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null", "-o", "ControlPath=~/.ssh/cm-%C",
+		"-o", "ControlMaster=auto", "-o", "ControlPersist=1m", "-at"}
+	awsDefaultKeys = []string{
+		"InstanceId", "ImageId", "PrivateIpAddress", "InstanceType",
+		"Placement.AvailabilityZone", "InstanceLifecycle", "LaunchTime", "SubnetId",
+	}
+	providersDefault = Provider{
+		SearchTags: SearchTags{
+			Dynamic: "Name",
+		}}
+)
 
 const (
 	configName = "config"
@@ -17,12 +32,10 @@ const (
 )
 
 type Config struct {
-	Flows    map[string][]Command `mapstructure:"flows"`
-	SSH      SSHGlobal            `mapstructure:"ssh"`
-	Profiles map[string]Profile   `mapstructure:"profiles"`
-}
-
-type Data struct {
+	Flows     map[string][]Command `mapstructure:"flows"`
+	SSH       `mapstructure:"ssh"`
+	Profiles  map[string]Profile  `mapstructure:"profiles"`
+	Providers map[string]Provider `mapstructure:"providers"`
 }
 
 type Command struct {
@@ -35,25 +48,27 @@ type Command struct {
 	Print      bool     `mapstructure:"print,omitempty"`
 }
 
-type SSHGlobal struct {
-	Args []string `mapstructure:"args,omitempty"`
-}
-
 type Profile struct {
 	Default   bool                `mapstructure:"default"`
 	Providers map[string]Provider `mapstructure:"providers"`
-	SSH       SSHPrivate          `mapstructure:"ssh"`
+	SSH       SSH                 `mapstructure:"ssh"`
 }
 
 type Provider struct {
-	CredsProfile string `mapstructure:"creds-profile"`
-	Region       string `mapstructure:"region"`
-	VPC          string `mapstructure:"vpc-id"`
+	CredsProfile string     `mapstructure:"creds-profile"`
+	Region       string     `mapstructure:"region"`
+	VPC          string     `mapstructure:"vpc-id"`
+	SearchTags   SearchTags `mapstructure:"filters"`
 }
 
-type SSHPrivate struct {
-	User   string `mapstructure:"user"`
-	Domain string `mapstructure:"domain"`
+type SearchTags struct {
+	Dynamic string            `mapstructure:"dynamic"`
+	Static  map[string]string `mapstructure:"static"`
+}
+type SSH struct {
+	User    string   `mapstructure:"user"`
+	Domain  string   `mapstructure:"domain"`
+	Options []string `mapstructure:"options,omitempty"`
 }
 
 func (c *Command) IsSet() bool {
@@ -70,7 +85,7 @@ func InitConfig() {
 //GetProfiles return a slice of the profiles found in config file
 func GetProfiles() []string {
 	var profiles []string
-	for p := range viper.GetStringMapString("profiles") {
+	for p := range cfg.Profiles {
 		profiles = append(profiles, p)
 	}
 	sort.Strings(profiles)
@@ -79,39 +94,57 @@ func GetProfiles() []string {
 
 //DefaultProfile return the selected default profile from config file
 func DefaultProfile() string {
-	for _, p := range GetProfiles() {
-		if viper.GetBool(fmt.Sprintf("profiles.%s.default", p)) {
+	for p, opts := range cfg.Profiles {
+		if opts.Default {
 			return p
 		}
 	}
-	return "undefined"
+	return "no default profile set in config"
+}
+
+//GetFlows returns flows part of config
+func GetFlows() map[string][]Command {
+	return cfg.Flows
+}
+
+//GetProviders returns slice of all current found providers
+func GetProviders() map[string]Provider {
+	profile := GetProfile()
+	return profile.Providers
 }
 
 //GetProfile return a subset of config file by profile selected in flags
-func GetProfile() *viper.Viper {
-	return viper.Sub(fmt.Sprintf("profiles.%s", viper.GetString("profile")))
+func GetProfile() Profile {
+	selectedProfile := viper.GetString("profile")
+	profile := cfg.Profiles[selectedProfile]
+	if profile.SSH.Options == nil {
+		profile.SSH.Options = sshOptions
+	}
+	return profile
 }
 
+//InitViper will create a new initialized viper per cmd
 func InitViper(v *viper.Viper) {
 	v.SetConfigName(configName)
 	v.SetConfigType(configType)
+
 	for _, path := range configFilePaths {
 		v.AddConfigPath(path)
 	}
-	if err := v.ReadInConfig(); err == nil {
-		if v == viper.GetViper() {
-			fmt.Println("Using config file:", viper.ConfigFileUsed())
-		}
+
+	if err := v.ReadInConfig(); err != nil {
+		log.Fatalf("unable to parse config, %v", err)
 	}
-	err := v.Unmarshal(&XT)
-	if err != nil {
-		logging.Main.Fatalf("unable to decode into struct, %v", err)
+
+	if err := v.Unmarshal(&cfg); err != nil {
+		log.Fatalf("unable to decode into struct, %v", err)
 	}
-	v.SetDefault("ssh.args", []string{
-		"-C", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null"})
-	v.SetDefault("commands.info.keys", []string{
-		"instanceId", "image", "type", "lifecycle", "arn", "privateIpAddress",
-		"key", "launchTime", "state", "availabilityZone", "privateDNS", "subnet", "vpc",
-	})
+
+	setDefaults()
+}
+
+func setDefaults() {
+	if cfg.SSH.Options == nil {
+		cfg.SSH.Options = sshOptions
+	}
 }
