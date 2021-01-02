@@ -12,7 +12,7 @@ builds:
       binary: bin/xt
       main: ./cmd/xt
       ldflags:
-        - -s -w -X github.com/adamkobi/xt/command.Version={{.Version}} -X github.com/adamkobi/xt/command.BuildDate={{time "2006-01-02"}}
+        - -s -w -X github.com/adamkobi/xt/internal/build.Version={{.Version}} -X github.com/adamkobi/xtinternal/build.Date={{time "2006-01-02"}}
         - -X main.updaterEnabled=adamkobi/xt
     id: macos
     goos: [darwin]
