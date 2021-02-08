@@ -8,6 +8,7 @@ import (
 	"github.com/adamkobi/xt/config"
 	"github.com/adamkobi/xt/pkg/executer"
 	"github.com/adamkobi/xt/pkg/provider"
+	"github.com/adamkobi/xt/pkg/utils"
 	"github.com/apex/log"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -148,7 +149,7 @@ func runDownload(opts *Options) error {
 	if opts.All {
 		uploadAll(executerOptions)
 	} else {
-		executerOptions.Hostname, err = provider.SelectHost(svcProvider.Names(), opts.SearchPattern)
+		executerOptions.Hostname, err = utils.Select(svcProvider.Names())
 		if err != nil {
 			return err
 		}

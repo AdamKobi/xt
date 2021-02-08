@@ -1,46 +1,22 @@
-package connect
+package config
 
 import (
 	"github.com/adamkobi/xt/command/factory"
-	"github.com/adamkobi/xt/config"
 	"github.com/adamkobi/xt/pkg/executer"
 	"github.com/adamkobi/xt/pkg/provider"
-	"github.com/adamkobi/xt/pkg/utils"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
-type Options struct {
-	Config        func() (*config.Config, error)
-	Log           func() *logrus.Logger
-	Debug         func()
-	SearchPattern string
-	Profile       string
-	Tag           string
-}
-
 //NewCmdConnect creates a connect command
-func NewCmdConnect(f *factory.CmdConfig) *cobra.Command {
+func NewCmdConfig(f *factory.CmdConfig) *cobra.Command {
 	opts := &Options{
 		Config: f.Config,
 		Debug:  f.Debug,
 		Log:    f.Log,
 	}
 	cmd := &cobra.Command{
-		Use:     "connect <servers>",
-		Short:   "SSH to server",
-		Args:    cobra.ExactArgs(1),
-		Aliases: []string{"c", "co", "con"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.SearchPattern = args[0]
-			opts.Tag, _ = cmd.Flags().GetString("tag")
-			opts.Profile, _ = cmd.Flags().GetString("profile")
-			if debug, _ := cmd.Flags().GetBool("debug"); debug {
-				opts.Debug()
-			}
-
-			return runConnect(opts)
-		},
+		Use:   "config <command>",
+		Short: "Config commands",
 	}
 
 	return cmd
@@ -80,7 +56,7 @@ func runConnect(opts *Options) error {
 		Args:   profile.SSHArgs(),
 	}
 
-	executerOptions.Hostname, err = utils.Select(svcProvider.Names())
+	executerOptions.Hostname, err = provider.SelectHost(svcProvider.Names(), opts.SearchPattern)
 	if err != nil {
 		return err
 	}
