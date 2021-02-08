@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -36,6 +37,14 @@ type EC2Instance struct {
 
 //ErrorNotFound is returned when no key exists for equivelent in EC2Instance struct
 const ErrorNotFound = "not found"
+
+type HostError struct {
+	Host string
+}
+
+func (e *HostError) Error() string {
+	return fmt.Sprintf("%s not found: lookup error", e.Host)
+}
 
 //NewAWSProvider returns AWS provider configs
 func NewAWSProvider(opts Options) *AWSProvider {
@@ -90,6 +99,7 @@ func (p *AWSProvider) Instances() error {
 	if err != nil {
 		return err
 	}
+
 	p.parseInstancesOutput(res)
 	return nil
 }
@@ -97,6 +107,10 @@ func (p *AWSProvider) Instances() error {
 //Names returns all instances names
 func (p *AWSProvider) Names() []string {
 	var instanceNames []string
+	if len(p.Hosts) == 0 {
+		return []string{p.Options.SearchPattern}
+	}
+
 	for _, instance := range p.Hosts {
 		instanceNames = append(instanceNames, instance.Name)
 	}

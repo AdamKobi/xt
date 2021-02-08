@@ -2,9 +2,7 @@ package provider
 
 import (
 	"fmt"
-	"sort"
 
-	"github.com/AlecAivazis/survey/v2"
 	awsProvider "github.com/adamkobi/xt/pkg/provider/aws"
 )
 
@@ -61,36 +59,4 @@ func GetInstancesByProvider(providers []Provider, s, t string) error {
 		}
 	}
 	return nil
-}
-
-//SelectInstance returns the user selected instance or default instance
-func SelectHost(hosts []string, searchPattern string) (string, error) {
-	if len(hosts) == 0 {
-		return searchPattern, nil
-	}
-	if len(hosts) == 1 {
-		return hosts[0], nil
-	}
-	msg := "Hosts:"
-	return GetChoices(hosts, msg)
-}
-
-//GetChoices will prompt user with server names found and require user to choose server
-func GetChoices(hosts []string, msg string) (string, error) {
-	var answers string
-	sort.Strings(hosts)
-	var qs = []*survey.Question{
-		{
-			Prompt: &survey.Select{
-				Message:  msg,
-				Options:  hosts,
-				PageSize: 15,
-			},
-		},
-	}
-	err := survey.Ask(qs, &answers)
-	if err != nil {
-		return "", err
-	}
-	return answers, nil
 }

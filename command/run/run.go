@@ -1,4 +1,4 @@
-package exec
+package run
 
 import (
 	"fmt"
@@ -28,8 +28,8 @@ type Options struct {
 	Force         bool
 }
 
-//NewCmdExec creates an exec command
-func NewCmdExec(f *factory.CmdConfig) *cobra.Command {
+//NewCmdRun creates an exec command
+func NewCmdRun(f *factory.CmdConfig) *cobra.Command {
 	opts := &Options{
 		Config: f.Config,
 		Debug:  f.Debug,
@@ -49,7 +49,7 @@ func NewCmdExec(f *factory.CmdConfig) *cobra.Command {
 			if debug, _ := cmd.Flags().GetBool("debug"); debug {
 				opts.Debug()
 			}
-			return runExec(opts)
+			return runCmds(opts)
 		},
 	}
 
@@ -60,9 +60,9 @@ func NewCmdExec(f *factory.CmdConfig) *cobra.Command {
 
 func checkUserApproval(opts *executer.Options) bool {
 	if opts.Hostname != "" {
-		return utils.GetApproval(strings.Join(opts.RemoteCmd, " "), []string{opts.Hostname})
+		return utils.ApproveRun(strings.Join(opts.RemoteCmd, " "), []string{opts.Hostname})
 	}
-	return utils.GetApproval(strings.Join(opts.RemoteCmd, " "), opts.Hostnames)
+	return utils.ApproveRun(strings.Join(opts.RemoteCmd, " "), opts.Hostnames)
 }
 
 func createSSHExecuters(opts *executer.Options) ([]executer.Factory, error) {
@@ -103,7 +103,7 @@ func runAll(opts *executer.Options) error {
 	return nil
 }
 
-func runExec(opts *Options) error {
+func runCmds(opts *Options) error {
 	cfg, _ := opts.Config()
 	profile, err := cfg.Profile(opts.Profile)
 	if err != nil {
@@ -140,7 +140,7 @@ func runExec(opts *Options) error {
 	}
 
 	if !opts.All {
-		executerOptions.Hostname, err = provider.SelectHost(svcProvider.Names(), opts.SearchPattern)
+		executerOptions.Hostname, err = utils.Select(svcProvider.Names())
 		if err != nil {
 			return err
 		}

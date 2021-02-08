@@ -32,6 +32,10 @@ func ParseConfig(filename string) (*Config, error) {
 	return parseConfigFile(filename)
 }
 
+func WriteDefaultConfigFile(data []byte) error {
+	return WriteConfigFile(DefaultFile(), data)
+}
+
 func ReadConfigFile(filename string) ([]byte, error) {
 	f, err := os.Open(filename)
 	if err != nil {

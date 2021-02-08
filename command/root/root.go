@@ -5,13 +5,12 @@ import (
 	"strings"
 
 	connectCmd "github.com/adamkobi/xt/command/connect"
-	execCmd "github.com/adamkobi/xt/command/exec"
 	"github.com/adamkobi/xt/command/factory"
+	runCmd "github.com/adamkobi/xt/command/run"
 
-	downloadCmd "github.com/adamkobi/xt/command/download"
+	fileCmd "github.com/adamkobi/xt/command/file"
 	flowCmd "github.com/adamkobi/xt/command/flow"
 	infoCmd "github.com/adamkobi/xt/command/info"
-	uploadCmd "github.com/adamkobi/xt/command/upload"
 
 	versionCmd "github.com/adamkobi/xt/command/version"
 
@@ -41,10 +40,9 @@ func NewCmdRoot(f *factory.CmdConfig, version, buildDate string) *cobra.Command 
 	cmd.AddCommand(versionCmd.NewCmdVersion(version, buildDate))
 	cmd.AddCommand(connectCmd.NewCmdConnect(f))
 	cmd.AddCommand(infoCmd.NewCmdInfo(f))
-	cmd.AddCommand(execCmd.NewCmdExec(f))
+	cmd.AddCommand(runCmd.NewCmdRun(f))
 	cmd.AddCommand(flowCmd.NewCmdFlow(f))
-	cmd.AddCommand(uploadCmd.NewCmdUpload(f))
-	cmd.AddCommand(downloadCmd.NewCmdDownload(f))
+	cmd.AddCommand(fileCmd.NewCmdFile(f))
 
 	return cmd
 }

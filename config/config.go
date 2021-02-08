@@ -21,12 +21,12 @@ type Config struct {
 }
 
 type FlowOptions struct {
-	Run      string   `yaml:"run"`
-	Selector string   `yaml:"selector,omitempty"`
-	Parse    string   `yaml:"parse,omitempty"`
-	Type     string   `yaml:"type,omitempty"`
-	Keys     []string `yaml:"keys,omitempty"`
-	Print    bool     `yaml:"print,omitempty"`
+	Run          string   `yaml:"run"`
+	Selector     string   `yaml:"selector,omitempty"`
+	Keys         []string `yaml:"keys,omitempty"`
+	Root         string   `yaml:"root,omitempty"`
+	OutputFormat string   `yaml:"output_format"`
+	Print        bool     `yaml:"print,omitempty"`
 }
 
 type ProfileOptions struct {
@@ -70,14 +70,14 @@ func (p *ProfileOptions) SCPArgs() []string {
 
 func defaultSSHOptions() []string {
 	return []string{
-		"-ta", "-C", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=no",
+		"-ta", "-C", "-o", "LogLevel=INFO", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-o", "ControlPath=~/.ssh/cm-%C",
 		"-o", "ControlMaster=auto", "-o", "ControlPersist=5m"}
 }
 
 func defaultSCPOptions() []string {
 	return []string{
-		"-C", "-o", "LogLevel=ERROR", "-o", "StrictHostKeyChecking=no",
+		"-C", "-o", "LogLevel=INFO", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-o", "ControlPath=~/.ssh/cm-%C",
 		"-o", "ControlMaster=auto", "-o", "ControlPersist=5m"}
 }
@@ -198,12 +198,12 @@ func (f *FlowOptions) Validate() error {
 	if f.Run == "" {
 		return fmt.Errorf("run is required for running a flow")
 	}
-	switch f.Type {
+	switch f.OutputFormat {
 	case JSON:
-		if f.Parse == "" {
+		if f.Root == "" {
 			return fmt.Errorf("parse must be set when using json type")
 		}
-		if f.Selector == "" {
+		if len(f.Selector) == 0 {
 			return fmt.Errorf("selector must be set when using json type")
 		}
 		return nil
