@@ -7,7 +7,6 @@ require (
 	github.com/apex/log v1.1.2
 	github.com/aws/aws-sdk-go v1.30.7
 	github.com/hashicorp/go-version v1.2.1
-	github.com/manifoldco/promptui v0.8.0
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
