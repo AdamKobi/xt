@@ -105,11 +105,11 @@ verifySupported() {
 checkDesiredVersion() {
   if [ "x$DESIRED_VERSION" == "x" ]; then
     # Get tag from release URL
-    local latest_release_url="https://api.github.com/repos/adamkobi/xt/releases/latest"
+    local latest_release_url="https://api.github.com/repos/adamkobi/xt/releases"
     if [ "${HAS_CURL}" == "true" ]; then
-      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' | grep rc |  sed -E 's/.*"([^"]+)".*/\1/')
     elif [ "${HAS_WGET}" == "true" ]; then
-      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | grep rc | sed -E 's/.*"([^"]+)".*/\1/')
     fi
   else
     TAG=$DESIRED_VERSION
@@ -137,9 +137,10 @@ checkXtInstalledVersion() {
 # for that binary.
 downloadFile() {
   XT_DIST="xt-$TAG-$OS-$ARCH.tar.gz"
-  CHECKSUM="xt-$TAG-checksums.txt"
-  DOWNLOAD_URL="https://github.com/adamkobi/xt/releases/$XT_DIST"
-  CHECKSUM_URL="https://github.com/adamkobi/xt/releases/$CHECKSUM"
+  CHECKSUM="xt-$TAG-$OS-$ARCH-checksums.txt"
+  GITHUB_URL="https://github.com/adamkobi/xt/releases/download/${TAG}/"
+  DOWNLOAD_URL="${GITHUB_URL}${XT_DIST}"
+  CHECKSUM_URL="${GITHUB_URL}${CHECKSUM}"
   XT_TMP_ROOT="$(mktemp -dt xt-installer-XXXXXX)"
   XT_TMP_FILE="$XT_TMP_ROOT/$XT_DIST"
   XT_SUM_FILE="$XT_TMP_ROOT/$CHECKSUM"
@@ -183,8 +184,10 @@ installFile() {
 verifyChecksum() {
   printf "Verifying checksum...\n"
   local sum=$(openssl sha1 -sha256 ${XT_TMP_FILE} | awk '{print $2}')
-  local expected_sum=$(cat ${XT_SUM_FILE} | grep ${XT_DIST})
+  local expected_sum=$(cat ${XT_SUM_FILE} | grep ${TAG})
   echo ${sum}
+  echo ${expected_sum}
+  cat ${XT_SUM_FILE} | grep ${TAG}
   if [ "$sum" != "$expected_sum" ]; then
     echo "SHA sum of ${XT_TMP_FILE} does not match. Aborting."
     exit 1

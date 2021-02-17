@@ -22,6 +22,9 @@ builds:
     goos: [linux]
     goarch: [amd64, arm64]
 
+checksum:
+  name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-checksums.txt"
+
 archives:
   - id: nix
     builds: [macos, linux]
