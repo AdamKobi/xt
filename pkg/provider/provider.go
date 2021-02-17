@@ -3,12 +3,13 @@ package provider
 import (
 	"fmt"
 
+	"github.com/adamkobi/xt/internal/instance"
 	awsProvider "github.com/adamkobi/xt/pkg/provider/aws"
 )
 
 var supportedProviders = [1]string{"aws"}
 
-//ProviderOptions is all the options AWSProvider can receive
+//Options is all the options AWSProvider can receive
 type Options struct {
 	Name            string
 	VPC             string
@@ -23,40 +24,29 @@ type Options struct {
 
 //Provider is an interface describing actions in cloud provider
 type Provider interface {
-	Instances() error
-	Names() []string
-	Print() error
+	Get() (instance.XTInstances, error)
 }
 
-type Instancer interface {
-	Name() string
-}
-
-func New(o *Options) (Provider, error) {
-	switch o.Name {
+//New creates a new provider according to the provider type
+func New(options *Options) (Provider, error) {
+	switch options.Name {
 	case "aws":
-		opts := awsProvider.Options{
-			VPC:             o.VPC,
-			Region:          o.Region,
-			CredsProfile:    o.CredsProfile,
-			AccessKeyID:     o.AccessKeyID,
-			SecretAccessKey: o.SecretAccessKey,
-			Tag:             o.Tag,
-			SearchPattern:   o.SearchPattern,
-			Filters:         o.Filters,
+		opts := &awsProvider.Options{
+			VPC:             options.VPC,
+			Region:          options.Region,
+			CredsProfile:    options.CredsProfile,
+			AccessKeyID:     options.AccessKeyID,
+			SecretAccessKey: options.SecretAccessKey,
+			Tag:             options.Tag,
+			SearchPattern:   options.SearchPattern,
+			Filters:         options.Filters,
 		}
-		return awsProvider.NewAWSProvider(opts), nil
+		p, err := awsProvider.New(opts)
+		if err != nil {
+			return nil, err
+		}
+		return p, nil
 	default:
-		return nil, fmt.Errorf("provider %s not supported", o.Name)
+		return nil, fmt.Errorf("provider %s not supported", options.Name)
 	}
-}
-
-//GetInstances returns slice of instance data per provider
-func GetInstancesByProvider(providers []Provider, s, t string) error {
-	for _, provider := range providers {
-		if err := provider.Instances(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

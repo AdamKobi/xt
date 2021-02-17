@@ -1,15 +1,16 @@
 # XT - Cloud SSH and utils tool
 A tool that allows super easy connection to Cloud provider instances through human readable names (using tags).
 The tool provides multiple other features related to remote instances, it is written in Go runs like lighting!
+Inspired from the amazing [gh](https://github.com/cli/cli), the official GitHub CLI tool. 
 
 # Features
-* SSH to various cloud providers and searching by human readable names through tags
-* Support multiple providers
+* All commands support searching Cloud providers using human readable tag names
+* SSH to remote servers
 * Support multiple environments (i.e. dev, prod, staging)
 * Run multiple commands on different servers concurrently 
 * Get info on servers and print to table
 * Run flows of commands and manipulate data in order to create advanced flows
-* Scp to/from servers concurrently
+* Upload/Download files concurrently
 
 # Requirements
 Xt is a wrapper around SSH and SCP, it uses these binaries to run commands instead of trying to write this code which is already running and tested for many years.
@@ -18,11 +19,11 @@ Xt is a wrapper around SSH and SCP, it uses these binaries to run commands inste
 
 # Installing
 ```
-TODO - write install script
+curl -fLO https://raw.githubusercontent.com/AdamKobi/xt/master/scripts/installer.sh | bash
 ```
 
 # Updates
-Xt will auto update in case of new version, you will be asked to confirm at the end of the run
+Xt will update when a new version is available, to install use the install command
 
 # Usage
 
@@ -49,7 +50,7 @@ profiles:
         region: us-east-1
         vpc-id: vpc-009988776655
     ssh: 
-      domain: "@prod-example.com"
+      domain: "@bastion@prod-example.com"
       user: ubuntu
 ```
 * `default: true` marks this profile as default profile to connect and requires no `profile` flag to connect
@@ -62,40 +63,35 @@ Xt provides default values but these can be changed via config file, for full co
 # Connect
 SSH to remote instance
 ```
-xt connect -p prod web
-Using config file: /Users/user1/.xt/config.yaml
-   • Found 2 hosts            
-? Instances:  [Use arrows to move, type to filter]
-> web-server-prod-1111
-  web-server-prod-2222
-   • Connecting to web-server-prod-1111...
+❯ xt connect -p prod web
+? Hosts:  [Use arrows to move, type to filter]
+> web-prod-5f9e
+  web-prod-931f
+connecting to web-prod-5f9e
 ```
 Connect will do the following:
 1. will query cloud providers for instances by filter, default is `Name`
-2. provide users with the matched instances list for selection
+2. provide user with the matched instances list for selection
 3. ssh to selected instance
 
 To search per different tag provide this via `-t` flag
 
-# Exec
+# Run
 Run commands on remote instances
 ```
-xt exec -p prod -a web ls
-Using config file: /Users/user1/.xt/config.yaml
-Will run the following: 
-Command: ls
-Hosts/Pods:
-web-server-prod-1111
-web-server-prod-2222
-Are you sure you want to continue Yes
-   • runnning command...       command=ls host=web-server-prod-1111
-   • runnning command...       command=ls host=web-server-prod-2222
-   • command output            command=ls exit-code=exit status 0 host=web-server-prod-1111
-test_file.sh
-test_file.txt
-   • command output            command=ls exit-code=exit status 0 host=web-server-prod-2222
-test_file.sh
-test_file.txt
+❯ xt run -p dev_old -a web hostname
+
+? Will Execute
+$ hostname
+On
+web-prod-109e
+web-prod-5f9e
+
+ Yes
+running command on web-prod-109e
+running command on web-prod-5f9e
+web-prod-5f9e | web-prod-5f9e
+web-prod-109e | web-prod-109e
 ```
 * to run command on all matches provide `-a` flag
 * to run command without approving it first provide `-f` flag
@@ -109,84 +105,114 @@ flows:
   connect-pod: 
     - 
       run: "kubectl get pods -o json -l app=microservice"
-      output:
-        type: json
-        root: items
-        identifier: metadata.name
+      output_format: json
+      root: items
+      selector: metadata.name
+      keys:
+      - metadata.labels.role
     - 
-      run: "kubectl exec -it __identifier__ bash"
-      tty: true
+      run: "kubectl exec -it {{.metadata_name}} -c microservice-{{.metadata_labels_role}} bash"
   print-pods-data: 
     - 
       run: "kubectl get pods -o json -l app=microservice"
-      output:
-        type: json
-        root: items
-        print: true
-        identifier: metadata.name
-        keys: 
-        - spec.nodeName
-        - metadata.labels.someLabel1
-        - metadata.labels.someLabel2
-        - spec.containers.0.image
+      output_format: json
+      root: items
+      print: true
+      selector: metadata.name
+      keys: 
+      - spec.nodeName
+      - metadata.labels.someLabel1
+      - metadata.labels.someLabel2
+    -
+      run: echo name is: {{.metadata_name}} nodeName is: {{.spec_nodeName}}
       
 ```
 Running flow:
 ```
->xt flow -p prod kube-bastion connect-pod
-Using config file: /Users/user1/.xt/config.yaml
-   • Found 2 hosts            
-? Instances: kube-bastion-1111
-   • runnning command...       command=kubectl get pods -o json -l app=microservice host=kube-bastion-1111
-   • Found 3 hosts            
+>xt flow run -p prod connect-pod bastion
 ? Instances:  [Use arrows to move, type to filter]
 > microservice-649695b9f8-qnjvq
   microservice-694d64dcfc-nzkl5
   microservice-59ff4998d5-5h6c5
-  • runnning command...       command=kubectl exec -it microservice-649695b9f8-qnjvq bash host=kube-bastion-1111
+microservice-service@microservice-6655bbcbcb-p2l49:/$
 
->xt flow -p prod kube-bastion print-pods-data
-Using config file: /Users/user1/.xt/config.yaml
-   • Found 2 hosts            
-? Instances: kube-bastion-1111
-   • runnning command...       command=kubectl get pods -o json -l app=microservice host=kube-bastion-1111
-• printing info...          command=[kubectl get pods -o json -l app=microservice] host=kube-bastion-1111
-NAME                            NODENAME        SOMELABEL1    SOMELABEL2    IMAGE                 
-microservice-649695b9f8-qnjvq   node-1-1-1-1    label1        label2        user1/microservice:1.0.0
-microservice-694d64dcfc-nzkl5   node-2-2-2-2    label1        label2        user1/microservice:1.0.0
-microservice-59ff4998d5-5h6c5   node-3-3-3-3    label1        label2        user1/microservice:1.0.0
+>xt flow run -p prod print-pods-data bastion
+NAME                            NODENAME        SOMELABEL1    SOMELABEL2                 
+microservice-649695b9f8-qnjvq   node-1-1-1-1    label1        label2       
+microservice-694d64dcfc-nzkl5   node-2-2-2-2    label1        label2        
+microservice-59ff4998d5-5h6c5   node-3-3-3-3    label1        label2
+name is: microservice-6655bbcbcb-p2l49 nodeName is: node-1-1-1-1     
 ```
 * `run` is the command to run
-* `type` allowed values: `text` `json` default is text => will not try to parse output
+* `output_format` allowed values: `text` `json` default is text => will not try to parse output
 * `print` if `true` will print output to stdout
-* `identifier` if `type` is `json` then `xt` will try to parse the output and find the provided identifier and save it for the next command which will than substitute the `__identifier__` with the selected name.
+* `selector` if `output_format` is `json` then `xt` will try to parse the output and find the provided selector then save it for the next command which will than substitute the `{{.some_selector}}` with the selected name.
 Additionally when the command returns it will provide a selectable menu from the found matches if more than 1 match was found.
-* `root` if `type` is `json` then `xt` will parse the json starting from the `root`, `root` should be an array of json objects
-* `keys` if `type` is `json` then `xt` will parse the json and collect the provided keys, if `print` is `true` then it will print it as a table
-* `tty` if set then will attempt to request tty from remote host
+* `root` if `output_format` is `json` then `xt` will parse the json starting from the `root`, `root` should be an array of json objects
+* `keys` if `output_format` is `json` then `xt` will parse the json and collect the provided keys, if `print` is `true` then it will print it as a table. Keys can be used also for subsititution of next commands
 
+Creating a flow
+```
+❯ xt flow add flow-example
+Adding new flow low-example
+
+? Please type command to run remotley ps -ef
+? Choose output format text
+? Add additional commands? Yes
+? Please type command to run remotley kubectl get pods -o json -l app=microservice
+? Choose output format  [Use arrows to move, type to filter, ? for more help]
+  text
+> json
+```
+
+Listing flows
+```
+xt flow list
+connect-pods:
+    - run: kubectl get pods -o json -l app=microservice
+      selector: metadata.name
+      keys:
+        - metadata.labels.role
+      root: items
+      output_format: json
+    - run: kubectl exec -it {{.metadata_name}}  -c microservice-{{.metadata_labels_role}} bash
+      output_format: ""
+print-pods-data:
+    - run: kubectl get pods -o json -l app=microservice
+      selector: metadata.name
+      keys:
+        - spec.nodeName
+        - metadata.labels.role
+      root: items
+      output_format: json
+      print: true
+    - run: 'echo name is: {{.metadata_name}} nodeName is: {{.spec_nodeName}}'
+      output_format: ""
+```
+
+Deleting flows
+```
+xt flow delete print-pods-data
+flow print-pods-data deleted successfully
+```
 # Info
 Query cloud provider instances by name and print a formated table of the data
 ```
 xt info -p prod web
-Using config file: /Users/user1/.xt/config.yaml
-NAME                    INSTANCEID              IMAGE                   TYPE            LIFECYCLE       ARN                                                             PRIVATEIPADDRESS       KEY             LAUNCHTIME                      STATE   AVAILABILITYZONE        PRIVATEDNS                                      SUBNET          VPC          
-web-server-1111    i-1111111111     ami-11111   c4.large       spot            arn:aws:iam::1111:instance-profile/web-server-1111      172.14.1.2          prod   2020-05-13 11:10:19 +0000 UTC   enabled us-east-1a              ip-172-14-1-2.us-east-1-1.compute.internal     subnet-111111 vpc-111111
-web-server-2222    i-2222222222     ami-11111   c4.large       spot            arn:aws:iam::1111:instance-profile/web-server-2222      172.14.1.3          prod   2020-05-14 05:17:38 +0000 UTC   enabled us-east-1b              ip-172-14-1-3.us-east-1-1.compute.internal     subnet-111111 vpc-111111
+IInstance Name         Instance ID          Type       Image ID               Private IP Address  Public IP Address  Availability Zone  Subnet           Launch Time            Lifecycle
+web-prod-109e  i-084516a4ac534109e  m4.xlarge  ami-111111111111111  172.20.235.214      not found          eu-west-1a         subnet-11111111  2021-02-16 20:03:4...  spot
+web-prod-5f9e  i-0f0ff242e85235f9e  c5.xlarge  ami-111111111111111  172.20.236.83       not found          eu-west-1b         subnet-11111111  2021-02-09 22:30:4...  spot
 ```
 
-# SCP
-Scp can download/upload from multiple servers.
+# File
+File can download/upload from multiple servers.
 ```
->xt -p prod scp -a web . /home/ubuntu/test_file 
-Using config file: /Users/user1/.xt/config.yaml
-   • runnning command...       command=web-server-1111_test_file|/home/admin/test_file host=web-server-1111
-   • runnning command...       command=web-server-2222_test_file|/home/admin/test_file host=web-server-2222
-   • command output            command=web-server-1111_test_file|/home/admin/test_file exit-code=exit status 0 host=web-server-1111
-   • command output            command=web-server-2222_test_file|/home/admin/test_file exit-code=exit status 0 host=web-server-2222
+>xt file get -a -p dev_old /home/admin/.bashrc . web
+running command on web-prod-109e
+running command on web-prod-5f9e
+.bashrc                                       100% 3773     7.8KB/s   00:00
+.bashrc                                       100% 3773     9.9KB/s   00:00
 
->ls
-web-server-1111_test_file  web-server-2222_test_file
 ```
 * when using `-a` (during download) files will be copied locally with the server_name as prefix in case multiple files are downloaded with same name
 * when using `-ua` (upload to all servers) files will be copied with original name

@@ -1,23 +1,31 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"os"
 	"path"
+	"runtime"
+	"strings"
 
-	rootCmd "github.com/adamkobi/xt/command/root"
-
-	"github.com/adamkobi/xt/command/factory"
-	"github.com/adamkobi/xt/config"
+	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/adamkobi/xt/internal/api"
 	"github.com/adamkobi/xt/internal/build"
+	"github.com/adamkobi/xt/internal/config"
 	"github.com/adamkobi/xt/internal/update"
+	"github.com/adamkobi/xt/pkg/cmdutil"
+	"github.com/adamkobi/xt/pkg/command/factory"
+	"github.com/adamkobi/xt/pkg/command/root"
 	"github.com/mgutz/ansi"
+	"github.com/spf13/cobra"
 )
 
 var updaterEnabled = ""
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	buildDate := build.Date
 	buildVersion := build.Version
 
@@ -27,30 +35,52 @@ func main() {
 		updateMessageChan <- rel
 	}()
 
-	f := factory.New()
-	log := f.Log()
-	_, err := f.Config()
+	hasDebug := os.Getenv("DEBUG") != ""
+
+	cmdFactory := factory.New()
+	stderr := cmdFactory.IOStreams.ErrOut
+	if !cmdFactory.IOStreams.ColorEnabled() {
+		surveyCore.DisableColor = true
+	} else {
+		// override survey's poor choice of color
+		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
+			switch style {
+			case "white":
+				if cmdFactory.IOStreams.ColorSupport256() {
+					return fmt.Sprintf("\x1b[%d;5;%dm", 38, 242)
+				}
+				return ansi.ColorCode("default")
+			default:
+				return ansi.ColorCode(style)
+			}
+		}
+	}
+
+	rootCmd := root.NewCmd(cmdFactory, buildVersion, buildDate)
+
+	_, err := cmdFactory.Config()
 	if err != nil {
-		log.Error(err)
+		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+		os.Exit(2)
+	}
+
+	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		printError(stderr, err, cmd, hasDebug)
 		os.Exit(1)
 	}
 
-	rootCmd := rootCmd.NewCmdRoot(f, buildVersion, buildDate)
-
-	if err := rootCmd.Execute(); err != nil {
-		log.Error(err)
+	if root.HasFailed() {
 		os.Exit(1)
 	}
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		msg := fmt.Sprintf("%s %s → %s\n%s",
+		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of xt is available:", "yellow"),
 			ansi.Color(buildVersion, "cyan"),
-			ansi.Color(newRelease.Version, "cyan"),
+			ansi.Color(newRelease.Version, "cyan"))
+		fmt.Fprintf(stderr, "%s\n\n",
 			ansi.Color(newRelease.URL, "yellow"))
-
-		fmt.Fprintf(os.Stdout, "\n\n%s\n\n", msg)
 	}
 }
 
@@ -79,4 +109,30 @@ func basicClient(currentVersion string) *api.Client {
 		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
 	}
 	return api.NewClient(opts...)
+}
+
+func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
+	if err == cmdutil.SilentError {
+		return
+	}
+
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		fmt.Fprintf(out, "error connecting to %s\n", dnsError.Name)
+		if debug {
+			fmt.Fprintln(out, dnsError)
+		}
+		fmt.Fprintln(out, "check your internet connection or githubstatus.com")
+		return
+	}
+
+	fmt.Fprintln(out, err)
+
+	var flagError *cmdutil.FlagError
+	if errors.As(err, &flagError) || strings.HasPrefix(err.Error(), "unknown command ") {
+		if !strings.HasSuffix(err.Error(), "\n") {
+			fmt.Fprintln(out)
+		}
+		fmt.Fprintln(out, cmd.UsageString())
+	}
 }
