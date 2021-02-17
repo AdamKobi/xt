@@ -8,23 +8,26 @@ before:
     - go mod tidy
 
 builds:
-  - <<: &build_defaults
-      binary: bin/xt
-      main: ./cmd
-      ldflags:
-        - -s -w -X github.com/adamkobi/xt/internal/build.Version={{.Version}} -X github.com/adamkobi/xtinternal/build.Date={{time "2006-01-02"}}
-        - -X main.updaterEnabled=adamkobi/xt
+  - binary: bin/xt
+    main: ./cmd
+    ldflags:
+      - -s -w -X github.com/adamkobi/xt/internal/build.Version={{.Version}} -X github.com/adamkobi/xtinternal/build.Date={{time "2006-01-02"}}
+      - -X main.updaterEnabled=adamkobi/xt
     id: macos
     goos: [darwin]
     goarch: [amd64]
-  - <<: *build_defaults
+  - binary: bin/xt
+    main: ./cmd
+    ldflags:
+      - -s -w -X github.com/adamkobi/xt/internal/build.Version={{.Version}} -X github.com/adamkobi/xtinternal/build.Date={{time "2006-01-02"}}
+      - -X main.updaterEnabled=adamkobi/xt
     id: linux
     goos: [linux]
     goarch: [amd64, arm64]
 
 checksum:
   name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}-checksums.txt"
-
+  
 archives:
   - id: nix
     builds: [macos, linux]
