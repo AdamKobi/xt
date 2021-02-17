@@ -1,6 +1,0 @@
-1. Add defaults for everything
-3. Change all defaults to const
-4. Add self-update
-5. Add travis-ci/circleci
-6. Add validators on config
-7. add option to search by multiple tags
