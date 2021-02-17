@@ -56,7 +56,7 @@ func runInfo(opts *Options) error {
 
 	cs := opts.IO.ColorScheme()
 	if profile.DisplayMsg != "" {
-		fmt.Fprintf(opts.IO.Out, cs.Yellow("%s"), profile.Message())
+		fmt.Fprintf(opts.IO.Out, cs.Red("%s"), profile.Message())
 	}
 
 	providerOpts := &provider.Options{

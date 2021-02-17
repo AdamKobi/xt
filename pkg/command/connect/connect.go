@@ -62,22 +62,21 @@ func NewCmdConnect(f *cmdutil.Factory) *cobra.Command {
 
 func runConnect(opts *Options) error {
 	cfg, _ := opts.Config()
-	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
-	p, err := cfg.Profile(opts.Profile)
+	profile, err := cfg.Profile(opts.Profile)
 	if err != nil {
 		return err
 	}
 
-	if p.DisplayMsg != "" {
-		fmt.Fprintf(out, cs.Red("%s"), p.Message())
+	if profile.DisplayMsg != "" {
+		fmt.Fprintf(opts.IO.Out, cs.Red("%s"), profile.Message())
 	}
 
 	providerOpts := &provider.Options{
-		Name:          p.ProviderOptions.Name,
-		VPC:           p.ProviderOptions.VPC,
-		Region:        p.ProviderOptions.Region,
-		CredsProfile:  p.ProviderOptions.CredsProfile,
+		Name:          profile.ProviderOptions.Name,
+		VPC:           profile.ProviderOptions.VPC,
+		Region:        profile.ProviderOptions.Region,
+		CredsProfile:  profile.ProviderOptions.CredsProfile,
 		Tag:           opts.Tag,
 		SearchPattern: opts.SearchPattern,
 	}
@@ -94,10 +93,10 @@ func runConnect(opts *Options) error {
 
 	cmdOpts := &executer.Options{
 		IO:     opts.IO,
-		User:   p.SSHOptions.User,
-		Domain: p.SSHOptions.Domain,
+		User:   profile.SSHOptions.User,
+		Domain: profile.SSHOptions.Domain,
 		Binary: executer.SSH,
-		Args:   p.SSHArgs(),
+		Args:   profile.SSHArgs(),
 	}
 
 	cmdOpts.Selected, err = utils.Select(opts.IO, instances.Names(), opts.SearchPattern)
