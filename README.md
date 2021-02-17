@@ -19,7 +19,7 @@ Xt is a wrapper around SSH and SCP, it uses these binaries to run commands inste
 
 # Installing
 ```
-curl -fLO https://raw.githubusercontent.com/AdamKobi/xt/master/scripts/installer.sh | bash
+curl -s https://raw.githubusercontent.com/AdamKobi/xt/master/scripts/installer.sh | bash -s
 ```
 
 # Updates
