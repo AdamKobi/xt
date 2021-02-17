@@ -75,12 +75,14 @@ func main() {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
+		installCmd := "curl -s https://raw.githubusercontent.com/AdamKobi/xt/master/scripts/installer.sh | bash -s"
 		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of xt is available:", "yellow"),
 			ansi.Color(buildVersion, "cyan"),
 			ansi.Color(newRelease.Version, "cyan"))
 		fmt.Fprintf(stderr, "%s\n\n",
 			ansi.Color(newRelease.URL, "yellow"))
+		fmt.Fprintf(stderr, "install with %s", installCmd)
 	}
 }
 
