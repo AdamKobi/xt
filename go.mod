@@ -19,7 +19,6 @@ require (
 	github.com/muesli/termenv v0.7.4
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/rivo/uniseg v0.1.0
-	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1 // indirect

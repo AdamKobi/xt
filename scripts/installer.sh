@@ -52,6 +52,7 @@ initOS() {
   case "$OS" in
     # Minimalist GNU for Windows
     mingw*) OS='windows';;
+    darwin*) OS='macOS';;
   esac
 }
 
@@ -69,7 +70,7 @@ runAsRoot() {
 # verifySupported checks that the os/arch combination is supported for
 # binary builds, as well whether or not necessary tools are present.
 verifySupported() {
-  local supported="darwin-amd64\nlinux-386\nlinux-amd64"
+  local supported="macOS-amd64\nlinux-386\nlinux-amd64"
   if ! echo "${supported}" | grep -q "${OS}-${ARCH}"; then
     echo "No prebuilt binary for ${OS}-${ARCH}."
     echo "To build from source, go to https://github.com/adamkobi/xt"
@@ -105,11 +106,11 @@ verifySupported() {
 checkDesiredVersion() {
   if [ "x$DESIRED_VERSION" == "x" ]; then
     # Get tag from release URL
-    local latest_release_url="https://github.com/adamkobi/xt/releases"
+    local latest_release_url="https://api.github.com/repos/adamkobi/xt/releases/latest"
     if [ "${HAS_CURL}" == "true" ]; then
-      TAG=$(curl -Ls $latest_release_url | grep 'href="/adamkobi/xt/releases/tag/v[0-9]*.[0-9]*.[0-9]*\"' | grep -v no-underline | head -n 1 | cut -d '"' -f 2 | awk '{n=split($NF,a,"/");print a[n]}' | awk 'a !~ $0{print}; {a=$0}')
+      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' |  sed -E 's/.*"([^"]+)".*/\1/')
     elif [ "${HAS_WGET}" == "true" ]; then
-      TAG=$(wget $latest_release_url -O - 2>&1 | grep 'href="/adamkobi/xt/releases/tag/v[0-9]*.[0-9]*.[0-9]*\"' | grep -v no-underline | head -n 1 | cut -d '"' -f 2 | awk '{n=split($NF,a,"/");print a[n]}' | awk 'a !~ $0{print}; {a=$0}')
+      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     fi
   else
     TAG=$DESIRED_VERSION
@@ -137,11 +138,13 @@ checkXtInstalledVersion() {
 # for that binary.
 downloadFile() {
   XT_DIST="xt-$TAG-$OS-$ARCH.tar.gz"
-  DOWNLOAD_URL="https://github.com/adamkobi/xt/releases/$XT_DIST"
-  CHECKSUM_URL="$DOWNLOAD_URL.sha256"
+  CHECKSUM="xt-$TAG-checksums.txt"
+  GITHUB_URL="https://github.com/adamkobi/xt/releases/download/${TAG}/"
+  DOWNLOAD_URL="${GITHUB_URL}${XT_DIST}"
+  CHECKSUM_URL="${GITHUB_URL}${CHECKSUM}"
   XT_TMP_ROOT="$(mktemp -dt xt-installer-XXXXXX)"
   XT_TMP_FILE="$XT_TMP_ROOT/$XT_DIST"
-  XT_SUM_FILE="$XT_TMP_ROOT/$XT_DIST.sha256"
+  XT_SUM_FILE="$XT_TMP_ROOT/$CHECKSUM"
   echo "Downloading $DOWNLOAD_URL"
   if [ "${HAS_CURL}" == "true" ]; then
     curl -SsL "$CHECKSUM_URL" -o "$XT_SUM_FILE"
@@ -150,6 +153,7 @@ downloadFile() {
     wget -q -O "$XT_SUM_FILE" "$CHECKSUM_URL"
     wget -q -O "$XT_TMP_FILE" "$DOWNLOAD_URL"
   fi
+  # ls -la ${XT_TMP_FILE}
 }
 
 # verifyFile verifies the SHA256 checksum of the binary package
@@ -168,8 +172,8 @@ verifyFile() {
 installFile() {
   XT_TMP="$XT_TMP_ROOT/$BINARY_NAME"
   mkdir -p "$XT_TMP"
-  tar xf "$XT_TMP_FILE" -C "$XT_TMP"
-  XT_TMP_BIN="$XT_TMP/$OS-$ARCH/xt"
+  tar zxf "$XT_TMP_FILE" -C "$XT_TMP"
+  XT_TMP_BIN="$XT_TMP/xt-${TAG}-${OS}-${ARCH}/bin/xt"
   echo "Preparing to install $BINARY_NAME into ${XT_INSTALL_DIR}"
   runAsRoot cp "$XT_TMP_BIN" "$XT_INSTALL_DIR/$BINARY_NAME"
   echo "$BINARY_NAME installed into $XT_INSTALL_DIR/$BINARY_NAME"
@@ -177,11 +181,9 @@ installFile() {
 
 # verifyChecksum verifies the SHA256 checksum of the binary package.
 verifyChecksum() {
-  printf "Verifying checksum... "
+  printf "Verifying checksum...\n"
   local sum=$(openssl sha1 -sha256 ${XT_TMP_FILE} | awk '{print $2}')
-  local expected_sum=$(cat ${XT_SUM_FILE})
-  echo ${expected_sum}
-  echo ${sum}
+  local expected_sum=$(cat ${XT_SUM_FILE} | grep ${XT_DIST} | cut -d ' ' -f1)
   if [ "$sum" != "$expected_sum" ]; then
     echo "SHA sum of ${XT_TMP_FILE} does not match. Aborting."
     exit 1
