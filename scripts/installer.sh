@@ -107,9 +107,9 @@ checkDesiredVersion() {
     # Get tag from release URL
     local latest_release_url="https://api.github.com/repos/adamkobi/xt/releases"
     if [ "${HAS_CURL}" == "true" ]; then
-      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' | grep rc |  sed -E 's/.*"([^"]+)".*/\1/')
+      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' | grep rc1 |  sed -E 's/.*"([^"]+)".*/\1/')
     elif [ "${HAS_WGET}" == "true" ]; then
-      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | grep rc | sed -E 's/.*"([^"]+)".*/\1/')
+      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | grep rc1 | sed -E 's/.*"([^"]+)".*/\1/')
     fi
   else
     TAG=$DESIRED_VERSION
