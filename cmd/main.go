@@ -112,7 +112,7 @@ func basicClient(currentVersion string) *api.Client {
 }
 
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
-	if err == cmdutil.SilentError {
+	if err == cmdutil.ErrSilent {
 		return
 	}
 

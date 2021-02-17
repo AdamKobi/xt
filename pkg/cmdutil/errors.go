@@ -15,5 +15,5 @@ func (fe FlagError) Unwrap() error {
 	return fe.Err
 }
 
-// SilentError is an error that triggers exit code 1 without any error messaging
-var SilentError = errors.New("SilentError")
+// ErrSilent is an error that triggers exit code 1 without any error messaging
+var ErrSilent = errors.New("SilentError")

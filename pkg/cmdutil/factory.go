@@ -3,12 +3,10 @@ package cmdutil
 import (
 	"github.com/adamkobi/xt/internal/config"
 	"github.com/adamkobi/xt/pkg/iostreams"
-	"github.com/sirupsen/logrus"
 )
 
+//Factory provides config func and iostreams for all commands
 type Factory struct {
 	IOStreams *iostreams.IOStreams
 	Config    func() (*config.Config, error)
-	Log       func() *logrus.Logger
-	Debug     func()
 }
