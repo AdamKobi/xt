@@ -105,11 +105,11 @@ verifySupported() {
 checkDesiredVersion() {
   if [ "x$DESIRED_VERSION" == "x" ]; then
     # Get tag from release URL
-    local latest_release_url="https://github.com/adamkobi/xt/releases"
+    local latest_release_url="https://api.github.com/repos/adamkobi/xt/releases/latest"
     if [ "${HAS_CURL}" == "true" ]; then
-      TAG=$(curl -Ls $latest_release_url | grep 'href="/adamkobi/xt/releases/tag/v[0-9]*.[0-9]*.[0-9]*\"' | grep -v no-underline | head -n 1 | cut -d '"' -f 2 | awk '{n=split($NF,a,"/");print a[n]}' | awk 'a !~ $0{print}; {a=$0}')
+      TAG=$(curl -Ls $latest_release_url | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     elif [ "${HAS_WGET}" == "true" ]; then
-      TAG=$(wget $latest_release_url -O - 2>&1 | grep 'href="/adamkobi/xt/releases/tag/v[0-9]*.[0-9]*.[0-9]*\"' | grep -v no-underline | head -n 1 | cut -d '"' -f 2 | awk '{n=split($NF,a,"/");print a[n]}' | awk 'a !~ $0{print}; {a=$0}')
+      TAG=$(wget $latest_release_url -O - 2>&1 | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     fi
   else
     TAG=$DESIRED_VERSION
@@ -137,12 +137,16 @@ checkXtInstalledVersion() {
 # for that binary.
 downloadFile() {
   XT_DIST="xt-$TAG-$OS-$ARCH.tar.gz"
+  CHECKSUM="xt-$TAG-checksums.txt"
   DOWNLOAD_URL="https://github.com/adamkobi/xt/releases/$XT_DIST"
-  CHECKSUM_URL="$DOWNLOAD_URL.sha256"
+  CHECKSUM_URL="https://github.com/adamkobi/xt/releases/$CHECKSUM"
   XT_TMP_ROOT="$(mktemp -dt xt-installer-XXXXXX)"
   XT_TMP_FILE="$XT_TMP_ROOT/$XT_DIST"
-  XT_SUM_FILE="$XT_TMP_ROOT/$XT_DIST.sha256"
+  XT_SUM_FILE="$XT_TMP_ROOT/$CHECKSUM"
   echo "Downloading $DOWNLOAD_URL"
+  echo "URLS"
+  echo $DOWNLOAD_URL
+  echo $CHECKSUM_URL
   if [ "${HAS_CURL}" == "true" ]; then
     curl -SsL "$CHECKSUM_URL" -o "$XT_SUM_FILE"
     curl -SsL "$DOWNLOAD_URL" -o "$XT_TMP_FILE"
@@ -177,10 +181,9 @@ installFile() {
 
 # verifyChecksum verifies the SHA256 checksum of the binary package.
 verifyChecksum() {
-  printf "Verifying checksum... "
+  printf "Verifying checksum...\n"
   local sum=$(openssl sha1 -sha256 ${XT_TMP_FILE} | awk '{print $2}')
-  local expected_sum=$(cat ${XT_SUM_FILE})
-  echo ${expected_sum}
+  local expected_sum=$(cat ${XT_SUM_FILE} | grep ${XT_DIST})
   echo ${sum}
   if [ "$sum" != "$expected_sum" ]; then
     echo "SHA sum of ${XT_TMP_FILE} does not match. Aborting."
