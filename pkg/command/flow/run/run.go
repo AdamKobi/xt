@@ -132,7 +132,6 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 		}
 
 		optsClone := *opts
-
 		optsClone.RemoteCmd = strings.Split(runCmd, " ")
 		e, err := executer.New(&optsClone)
 		if err != nil {
@@ -167,7 +166,6 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 				}
 			}
 		default:
-			fmt.Println("inside default")
 			if err := e.Connect(); err != nil {
 				return err
 			}
@@ -244,8 +242,11 @@ func selectorKeys(data []map[string]string, selector string) (map[string]string,
 //printJSON writes the fields requested by user to console in a formated table
 func printJSON(io *iostreams.IOStreams, data []map[string]string) {
 	cs := io.ColorScheme()
-	table := utils.NewTablePrinter(io)
+	if len(data) == 0 {
+		fmt.Fprintf(io.ErrOut, cs.Gray("no data received"))
+	}
 
+	table := utils.NewTablePrinter(io)
 	var header []string
 	for key := range data[0] {
 		nameSlice := strings.Split(key, ".")
@@ -263,6 +264,7 @@ func printJSON(io *iostreams.IOStreams, data []map[string]string) {
 		}
 		table.EndRow()
 	}
+
 	_ = table.Render()
 }
 
