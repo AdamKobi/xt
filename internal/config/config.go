@@ -65,7 +65,7 @@ func (p *ProfileOptions) SCPArgs() []string {
 
 func defaultSSHOptions() []string {
 	return []string{
-		"-C", "-o", "LogLevel=INFO", "-o", "StrictHostKeyChecking=no",
+		"-Ct", "-o", "LogLevel=INFO", "-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null", "-o", "ControlPath=~/.ssh/cm-%C",
 		"-o", "ControlMaster=auto", "-o", "ControlPersist=5m"}
 }

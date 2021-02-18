@@ -3,7 +3,6 @@ package run
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
 	"text/template"
@@ -15,7 +14,6 @@ import (
 	"github.com/adamkobi/xt/pkg/iostreams"
 	"github.com/adamkobi/xt/pkg/provider"
 	"github.com/adamkobi/xt/pkg/utils"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/tidwall/gjson"
 )
@@ -133,8 +131,9 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 			runCmd = cmd.Run
 		}
 
-		opts.RemoteCmd = strings.Split(runCmd, " ")
-		e, err := executer.New(opts)
+		optsClone := *opts
+		optsClone.RemoteCmd = strings.Split(runCmd, " ")
+		e, err := executer.New(&optsClone)
 		if err != nil {
 			return err
 		}
@@ -152,7 +151,7 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 			}
 
 			if cmd.Print {
-				printJSON(parsedOutput)
+				printJSON(optsClone.IO, parsedOutput)
 			}
 
 			if idx < len(flow)-1 {
@@ -241,45 +240,32 @@ func selectorKeys(data []map[string]string, selector string) (map[string]string,
 }
 
 //printJSON writes the fields requested by user to console in a formated table
-func printJSON(data []map[string]string) error {
-	if data == nil {
-		return fmt.Errorf("no data recevied, unable to proceed")
+func printJSON(io *iostreams.IOStreams, data []map[string]string) {
+	cs := io.ColorScheme()
+	if len(data) == 0 {
+		fmt.Fprintf(io.ErrOut, cs.Gray("no data received"))
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := utils.NewTablePrinter(io)
 	var header []string
-
 	for key := range data[0] {
 		nameSlice := strings.Split(key, ".")
 		normalizedName := nameSlice[len(nameSlice)-1]
 		if validateHeader(header, normalizedName) {
 			normalizedName = nameSlice[len(nameSlice)-2] + "." + normalizedName
 		}
-		header = append(header, normalizedName)
+		table.AddField(normalizedName, nil, cs.MagentaBold)
 	}
+	table.EndRow()
 
 	for _, item := range data {
-		var line []string
 		for _, v := range item {
-			line = append(line, v)
+			table.AddField(v, nil, cs.Green)
 		}
-		table.Append(line)
+		table.EndRow()
 	}
 
-	table.SetHeader(header)
-	table.SetAutoWrapText(false)
-	table.SetAutoFormatHeaders(true)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetCenterSeparator("")
-	table.SetColumnSeparator("")
-	table.SetRowSeparator("")
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("\t") // pad with tabs
-	table.SetNoWhiteSpace(true)
-	table.Render()
-	return nil
+	_ = table.Render()
 }
 
 func validateHeader(headers []string, testedHeader string) bool {
