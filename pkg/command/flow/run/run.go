@@ -59,6 +59,7 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 
 	return cmd
 }
+
 func runFlow(opts *Options) error {
 	cfg, _ := opts.Config()
 	profile, err := cfg.Profile(opts.Profile)
@@ -110,22 +111,23 @@ func runFlow(opts *Options) error {
 	}
 	return runCommands(cmdOpts, flow)
 }
+
 func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 	var (
-		keys          map[string]string
+		selectedKeys  map[string]string
 		runCmd        string
 		renderedTempl bytes.Buffer
 	)
 
 	for idx, cmd := range flow {
 
-		runCmdTempl, err := template.New(fmt.Sprintf("cmd_%d", idx)).Parse(cmd.Run)
-		if err != nil {
-			return err
-		}
+		if selectedKeys != nil {
+			runCmdTempl, err := template.New(fmt.Sprintf("cmd_%d", idx)).Parse(cmd.Run)
+			if err != nil {
+				return err
+			}
 
-		if keys != nil {
-			runCmdTempl.Execute(&renderedTempl, keys)
+			runCmdTempl.Execute(&renderedTempl, selectedKeys)
 			runCmd = renderedTempl.String()
 		} else {
 			runCmd = cmd.Run
@@ -151,7 +153,7 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 			}
 
 			if cmd.Print {
-				printJSON(optsClone.IO, parsedOutput)
+				printJSON(optsClone.IO, cmd.GetKeys(), parsedOutput)
 			}
 
 			if idx < len(flow)-1 {
@@ -160,10 +162,8 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 					return err
 				}
 
-				keys, err = selectorKeys(parsedOutput, selectorName)
-				if err != nil {
-					return err
-				}
+				selectedKeys = getDataFromSelected(parsedOutput, selectorName)
+
 			}
 		default:
 			if err := e.Connect(); err != nil {
@@ -176,32 +176,24 @@ func runCommands(opts *executer.Options, flow []config.FlowOptions) error {
 
 //parseJSONFromFlow fetches all selectors from input json and returns an json with selectors and values
 func parseJSONFromFlow(json string, cmd config.FlowOptions) ([]map[string]string, error) {
-	var parsedJSON []map[string]string
 	rootSlice := gjson.Get(json, cmd.Root)
 	if !rootSlice.IsArray() {
 		return nil, fmt.Errorf("%s is not a list, parse must be a list", cmd.Root)
 	}
 
+	var parsedJSON []map[string]string
 	for _, item := range rootSlice.Array() {
-		var parsedItem = make(map[string]string)
-		result := item.Get(cmd.Selector)
-		if result.Exists() {
-			parsedItem[cmd.Selector] = result.String()
-			parsedJSON = append(parsedJSON, parsedItem)
-		} else {
-			return nil, fmt.Errorf("selector `%s` not found", cmd.Selector)
-		}
-
+		var parsedObject = make(map[string]string)
 		for _, key := range cmd.Keys {
-			result := item.Get(key)
+			result := item.Get(key.Path)
 			if result.Exists() {
-				parsedItem[key] = result.String()
+				parsedObject[key.Name] = result.String()
 			} else {
 				return nil, fmt.Errorf("key `%s` not found", key)
 			}
 		}
+		parsedJSON = append(parsedJSON, parsedObject)
 	}
-
 	return parsedJSON, nil
 }
 
@@ -217,62 +209,39 @@ func getSelectors(data []map[string]string, cmd config.FlowOptions) []string {
 }
 
 //selectorKeys returns a map of the selected selector
-func selectorKeys(data []map[string]string, selector string) (map[string]string, error) {
-	var wantedItem map[string]string
-	normalizedKeys := make(map[string]string)
+func getDataFromSelected(data []map[string]string, selected string) map[string]string {
 	for _, item := range data {
 		for _, v := range item {
-			if v == selector {
-				wantedItem = item
-				break
+			if v == selected {
+				return item
 			}
 		}
 	}
-
-	for k, v := range wantedItem {
-		normalizedKeys[strings.ReplaceAll(k, ".", "_")] = v
-	}
-
-	if len(normalizedKeys) == 0 {
-		return nil, fmt.Errorf("selector %s not found: lookup error", selector)
-	}
-	return normalizedKeys, nil
+	return nil
 }
 
 //printJSON writes the fields requested by user to console in a formated table
-func printJSON(io *iostreams.IOStreams, data []map[string]string) {
+func printJSON(io *iostreams.IOStreams, headers []string, data []map[string]string) {
 	cs := io.ColorScheme()
 	if len(data) == 0 {
 		fmt.Fprintf(io.ErrOut, cs.Gray("no data received"))
 	}
 
 	table := utils.NewTablePrinter(io)
-	var header []string
-	for key := range data[0] {
-		nameSlice := strings.Split(key, ".")
-		normalizedName := nameSlice[len(nameSlice)-1]
-		if validateHeader(header, normalizedName) {
-			normalizedName = nameSlice[len(nameSlice)-2] + "." + normalizedName
-		}
-		table.AddField(normalizedName, nil, cs.MagentaBold)
+
+	for _, header := range headers {
+		table.AddField(header, nil, cs.MagentaBold)
 	}
 	table.EndRow()
 
 	for _, item := range data {
-		for _, v := range item {
-			table.AddField(v, nil, cs.Green)
+		for _, header := range headers {
+			if val, ok := item[header]; ok {
+				table.AddField(val, nil, cs.Green)
+			}
 		}
 		table.EndRow()
 	}
 
 	_ = table.Render()
-}
-
-func validateHeader(headers []string, testedHeader string) bool {
-	for _, h := range headers {
-		if h == testedHeader {
-			return true
-		}
-	}
-	return false
 }

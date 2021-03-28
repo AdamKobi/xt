@@ -16,12 +16,17 @@ type Config struct {
 }
 
 type FlowOptions struct {
-	Run          string   `yaml:"run"`
-	Selector     string   `yaml:"selector,omitempty"`
-	Keys         []string `yaml:"keys,omitempty"`
-	Root         string   `yaml:"root,omitempty"`
-	OutputFormat string   `yaml:"output_format"`
-	Print        bool     `yaml:"print,omitempty"`
+	Run          string `yaml:"run"`
+	Selector     string `yaml:"selector"`
+	Keys         []Pair `yaml:"keys,omitempty"`
+	Root         string `yaml:"root,omitempty"`
+	OutputFormat string `yaml:"output_format"`
+	Print        bool   `yaml:"print,omitempty"`
+}
+
+type Pair struct {
+	Name string `yaml:"name"`
+	Path string `yaml:"path"`
 }
 
 type ProfileOptions struct {
@@ -201,11 +206,39 @@ func (f *FlowOptions) Validate() error {
 		if f.Root == "" {
 			return fmt.Errorf("parse must be set when using json type")
 		}
-		if len(f.Selector) == 0 {
-			return fmt.Errorf("selector must be set when using json type")
+		if len(f.Keys) < 1 {
+			return fmt.Errorf("keys must be set when using json type")
+		}
+		if f.Selector != "" {
+			valid := false
+			for _, key := range f.Keys {
+				if f.Selector == key.Name {
+					valid = true
+				}
+			}
+			if !valid {
+				return fmt.Errorf("selector must equal to one of keys provided")
+			}
 		}
 		return nil
 	default:
 		return nil
 	}
+}
+
+func (f *FlowOptions) GetSelector() *Pair {
+	for _, key := range f.Keys {
+		if f.Selector == key.Name {
+			return &key
+		}
+	}
+	return nil
+}
+
+func (f *FlowOptions) GetKeys() []string {
+	var keys []string
+	for _, key := range f.Keys {
+		keys = append(keys, key.Name)
+	}
+	return keys
 }

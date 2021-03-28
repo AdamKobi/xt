@@ -39,6 +39,12 @@ func main() {
 
 	cmdFactory := factory.New()
 	stderr := cmdFactory.IOStreams.ErrOut
+	_, err := cmdFactory.Config()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
+		os.Exit(2)
+	}
+
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
 	} else {
@@ -57,12 +63,6 @@ func main() {
 	}
 
 	rootCmd := root.NewCmd(cmdFactory, buildVersion, buildDate)
-
-	_, err := cmdFactory.Config()
-	if err != nil {
-		fmt.Fprintf(stderr, "failed to read configuration:  %s\n", err)
-		os.Exit(2)
-	}
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
 		printError(stderr, err, cmd, hasDebug)

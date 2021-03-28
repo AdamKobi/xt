@@ -67,8 +67,13 @@ func runAdd(opts *Options) error {
 			Help:    "Selector will return a picker to select the correct data set to collect from.\nFor nested keys use dot notation",
 		}
 
-		key := &survey.Input{
-			Message: "JSON key to parse from command output",
+		keyName := &survey.Input{
+			Message: "JSON key name, this will be used in next commands as placeholder for replacement",
+			Help:    "JSON key is collected from output and than can be used on next commands.\nFor nested keys use dot notation",
+		}
+
+		keyValue := &survey.Input{
+			Message: "JSON key path to parse from command output",
 			Help:    "JSON key is collected from output and than can be used on next commands.\nFor nested keys use dot notation",
 		}
 
@@ -99,10 +104,6 @@ func runAdd(opts *Options) error {
 		}
 
 		if cmd.OutputFormat == "json" {
-			if err := survey.AskOne(selector, &cmd.Selector); err != nil {
-				return err
-			}
-
 			addKeysAnswer := false
 			if err := survey.AskOne(addKeys, &addKeysAnswer); err != nil {
 				return err
@@ -113,8 +114,11 @@ func runAdd(opts *Options) error {
 					if !addMoreKeysAnswer {
 						break
 					}
-					var keyAnswer string
-					if err := survey.AskOne(key, &keyAnswer); err != nil {
+					var keyAnswer config.Pair
+					if err := survey.AskOne(keyName, &keyAnswer.Name); err != nil {
+						return err
+					}
+					if err := survey.AskOne(keyValue, &keyAnswer.Path); err != nil {
 						return err
 					}
 					cmd.Keys = append(cmd.Keys, keyAnswer)
@@ -123,6 +127,10 @@ func runAdd(opts *Options) error {
 						return err
 					}
 				}
+			}
+
+			if err := survey.AskOne(selector, &cmd.Keys[0]); err != nil {
+				return err
 			}
 
 			if err := survey.AskOne(table, &cmd.Print); err != nil {
