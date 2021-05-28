@@ -6,6 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/adamkobi/xt/internal/config"
+	"github.com/adamkobi/xt/internal/instance"
 	"github.com/adamkobi/xt/pkg/cmdutil"
 	"github.com/adamkobi/xt/pkg/executer"
 	"github.com/adamkobi/xt/pkg/iostreams"
@@ -72,23 +73,26 @@ func runConnect(opts *Options) error {
 		fmt.Fprintf(opts.IO.Out, cs.Red("%s"), profile.Message())
 	}
 
-	providerOpts := &provider.Options{
-		Name:          profile.ProviderOptions.Name,
-		VPC:           profile.ProviderOptions.VPC,
-		Region:        profile.ProviderOptions.Region,
-		CredsProfile:  profile.ProviderOptions.CredsProfile,
-		Tag:           opts.Tag,
-		SearchPattern: opts.SearchPattern,
-	}
+	var instances instance.XTInstances
+	for _, p := range profile.ProviderOptions {
+		opts := &provider.Options{
+			Name:          p.Name,
+			VPC:           p.VPC,
+			Region:        p.Region,
+			CredsProfile:  p.CredsProfile,
+			Tag:           opts.Tag,
+			SearchPattern: opts.SearchPattern,
+		}
+		svc, err := provider.New(opts)
+		if err != nil {
+			return err
+		}
 
-	svc, err := provider.New(providerOpts)
-	if err != nil {
-		return err
-	}
-
-	instances, err := svc.Get()
-	if err != nil {
-		return err
+		i, err := svc.Get()
+		if err != nil {
+			return err
+		}
+		instances = append(instances, i...)
 	}
 
 	cmdOpts := &executer.Options{
