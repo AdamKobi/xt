@@ -36,16 +36,20 @@ profiles:
   dev: 
     default: true
     providers: 
-      aws: 
+      - name: aws
         creds-profile: dev
-        region: us-west-1
+        region: us-east-1
         vpc-id: vpc-112233445566
+      - name: aws
+        creds-profile: dev
+        region: eu-west-1
+        vpc-id: vpc-987654312876
     ssh: 
       domain: "@dev-example.com"
       user: ec2-user
   prod: 
     providers: 
-      aws: 
+      - name: aws 
         creds-profile: prod
         region: us-east-1
         vpc-id: vpc-009988776655
@@ -103,28 +107,26 @@ Run multiple commands pre-configured, manipulate data between each command and p
 ```
 flows: 
   connect-pod: 
-    - 
-      run: "kubectl get pods -o json -l app=microservice"
-      output_format: json
+    - run: kubectl get pods -ojson -l app=someapp
       root: items
-      selector: metadata.name
+      output_format: json
+      selector: name
       keys:
-      - metadata.labels.role
-    - 
-      run: "kubectl exec -it {{.metadata_name}} -c microservice-{{.metadata_labels_role}} bash"
-  print-pods-data: 
-    - 
-      run: "kubectl get pods -o json -l app=microservice"
-      output_format: json
+      - name: name
+        path: metadata.name
+      - name: role
+        path: metadata.labels.role
+    - run: kubectl exec -it {{.name}} -c someContainer-{{.role}} bash
+  print-pods:
+    - run: kubectl get pods -ojson -l app=someapp
       root: items
+      keys:
+      - name: name
+        path: metadata.name
+      - name: role
+        path: metadata.labels.role
+      output_format: json
       print: true
-      selector: metadata.name
-      keys: 
-      - spec.nodeName
-      - metadata.labels.someLabel1
-      - metadata.labels.someLabel2
-    -
-      run: echo name is: {{.metadata_name}} nodeName is: {{.spec_nodeName}}
       
 ```
 Running flow:
@@ -168,32 +170,33 @@ Adding new flow low-example
 Listing flows
 ```
 xt flow list
-connect-pods:
-    - run: kubectl get pods -o json -l app=microservice
-      selector: metadata.name
-      keys:
-        - metadata.labels.role
-      root: items
-      output_format: json
-    - run: kubectl exec -it {{.metadata_name}}  -c microservice-{{.metadata_labels_role}} bash
-      output_format: ""
-print-pods-data:
-    - run: kubectl get pods -o json -l app=microservice
-      selector: metadata.name
-      keys:
-        - spec.nodeName
-        - metadata.labels.role
-      root: items
-      output_format: json
-      print: true
-    - run: 'echo name is: {{.metadata_name}} nodeName is: {{.spec_nodeName}}'
-      output_format: ""
+connect-pod: 
+  - run: kubectl get pods -ojson -l app=someapp
+    root: items
+    output_format: json
+    selector: name
+    keys:
+    - name: name
+      path: metadata.name
+    - name: role
+      path: metadata.labels.role
+  - run: kubectl exec -it {{.name}} -c someContainer-{{.role}} bash
+print-pods:
+  - run: kubectl get pods -ojson -l app=someapp
+    root: items
+    keys:
+    - name: name
+      path: metadata.name
+    - name: role
+      path: metadata.labels.role
+    output_format: json
+    print: true
 ```
 
 Deleting flows
 ```
-xt flow delete print-pods-data
-flow print-pods-data deleted successfully
+xt flow delete print-pods
+flow print-pods deleted successfully
 ```
 # Info
 Query cloud provider instances by name and print a formated table of the data

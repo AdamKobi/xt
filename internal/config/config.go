@@ -30,10 +30,10 @@ type Pair struct {
 }
 
 type ProfileOptions struct {
-	Default         bool            `yaml:"default"`
-	ProviderOptions ProviderOptions `yaml:"provider"`
-	SSHOptions      SSHOptions      `yaml:"ssh"`
-	DisplayMsg      string          `yaml:"message,omitempty"`
+	Default         bool              `yaml:"default"`
+	ProviderOptions []ProviderOptions `yaml:"providers"`
+	SSHOptions      SSHOptions        `yaml:"ssh"`
+	DisplayMsg      string            `yaml:"message,omitempty"`
 }
 
 type ProviderOptions struct {
@@ -136,9 +136,12 @@ func (p *ProfileOptions) Validate() error {
 	if err := p.SSHOptions.validate(); err != nil {
 		return err
 	}
-	if err := p.ProviderOptions.validate(); err != nil {
-		return err
+	for _, pr := range p.ProviderOptions {
+		if err := pr.validate(); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }
 
@@ -193,7 +196,7 @@ func (p *ProviderOptions) validate() error {
 }
 
 //Provider returns the selected profile config
-func (p *ProfileOptions) Provider() ProviderOptions {
+func (p *ProfileOptions) Provider() []ProviderOptions {
 	return p.ProviderOptions
 }
 
