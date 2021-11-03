@@ -1,6 +1,8 @@
 package aws
 
 import (
+	"os/exec"
+
 	"github.com/adamkobi/xt/internal/instance"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -51,16 +53,36 @@ func New(opts *Options) (*Provider, error) {
 }
 
 func newEC2(opts *Options) (*ec2.EC2, error) {
-	session, err := session.NewSessionWithOptions(session.Options{
-		Config:  aws.Config{Region: &opts.Region},
-		Profile: opts.CredsProfile,
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Profile:           opts.CredsProfile,
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	return ec2.New(session), nil
+	if _, err := sess.Config.Credentials.Get(); err != nil {
+		if err := ssoLogin(opts); err != nil {
+			return nil, err
+		}
+	}
+
+	return ec2.New(sess), nil
+}
+
+func ssoLogin(opts *Options) error {
+	binary := "aws"
+	if _, err := exec.LookPath(binary); err != nil {
+		return err
+	}
+
+	args := []string{"sso", "login", "--profile", opts.CredsProfile}
+	cmd := exec.Command(binary, args...)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
 
 //Get will filter all instances according to tag
