@@ -10,7 +10,6 @@ require (
 	github.com/charmbracelet/glamour v0.2.1-0.20200724174618-1246d13c1684
 	github.com/cli/safeexec v1.0.0
 	github.com/creack/pty v1.1.11
-	github.com/go-sql-driver/mysql v1.5.0 // indirect
 	github.com/hashicorp/go-version v1.2.1
 	github.com/mattn/go-colorable v0.1.8
 	github.com/mattn/go-isatty v0.0.12
