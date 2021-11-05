@@ -62,13 +62,14 @@ func newEC2(opts *Options) (*ec2.EC2, error) {
 		return nil, err
 	}
 
-	if _, err := sess.Config.Credentials.Get(); err != nil {
+	_, err = sess.Config.Credentials.Get()
+	if err != nil {
 		if err := ssoLogin(opts); err != nil {
 			return nil, err
 		}
 	}
 
-	return ec2.New(sess), nil
+	return ec2.New(sess, aws.NewConfig().WithRegion(opts.Region)), nil
 }
 
 func ssoLogin(opts *Options) error {
